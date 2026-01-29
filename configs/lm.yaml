@@ -1,0 +1,13 @@
+vocab_size: 151936
+dim_model: 1024
+dim_k: 128
+num_q_heads: 16
+group_size: 2
+num_decoder_layers: 28
+intermediate_size: 3072
+eps: 1e-6
+dropout: 0.1
+batch_size: 32
+seq_length: 1024
+num_epochs: 10
+learning_rate: 0.0003
