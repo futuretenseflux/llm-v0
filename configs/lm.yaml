@@ -11,3 +11,11 @@ batch_size: 32
 seq_length: 1024
 num_epochs: 10
 learning_rate: 0.0003
+corpus_split:
+  general_web: 6000000000
+  books: 3000000000
+  academic_papers: 4000000000
+  code: 1800000000
+  math_technical_reasoning: 4000000000
+  warmup: 200000000
+  conversation_forum: 1000000000
