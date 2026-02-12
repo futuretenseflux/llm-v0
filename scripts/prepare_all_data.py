@@ -9,12 +9,12 @@ from pathlib import Path
 
 # List of data prep scripts to run, in order
 DATA_PREP_SCRIPTS = [
-    "src/data/pretraining/books_prepare.py",
-    "src/data/pretraining/code_prepare.py",
-    "src/data/pretraining/conv_forum_prepare.py",
-    "src/data/pretraining/math_prepare.py",
-    "src/data/pretraining/papers_prepare.py",
-    "src/data/pretraining/primer_prepare.py",
+    "src/data/pretraining/preparation/books_prepare.py",
+    "src/data/pretraining/preparation/code_prepare.py",
+    "src/data/pretraining/preparation/conv_forum_prepare.py",
+    "src/data/pretraining/preparation/math_prepare.py",
+    "src/data/pretraining/preparation/papers_prepare.py",
+    "src/data/pretraining/preparation/primer_prepare.py",
 ]
 
 def run_script(script_path: str) -> bool:
