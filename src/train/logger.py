@@ -12,10 +12,6 @@ class TrainLogger:
     def log_batch(self, epoch: int, batch_idx: int, loss_value: float, step: int):
         wandb.log({"train/loss": loss_value, "train/epoch": epoch, "train/batch": batch_idx}, step=step)
 
-    def log_epoch(self, epoch: int, avg_loss: float):
-        elapsed = time.time() - self.start_time
-        wandb.log({"train/epoch_avg_loss": avg_loss, "train/epoch": epoch, "time/elapsed_sec": elapsed})
-
     def finish(self):
         if self.run is not None:
             self.run.finish()

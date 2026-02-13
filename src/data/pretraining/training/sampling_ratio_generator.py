@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-DATASET_ORDER = ["web", "books", "papers", "code", "math", "convo_forum", "primer"]
+DATASET_ORDER = ["web", "books", "papers", "code", "math", "conv_forum", "primer"]
 
 def get_sampling_ratios(tokens_elapsed):
     current_token_count = tokens_elapsed / 1e9
