@@ -2,16 +2,17 @@
 import torch
 
 class RoPE:
-    def __init__(self):
+    def __init__(self, base=50000):
         self.cos_cache = None
         self.sin_cache = None
         self.theta = None
         self.cached_seq = 0
         self.cached_d = 0
+        self.base = base
 
     def get_rot_cached(self, d, seq_length, device):
         if self.cos_cache is None:
-            self.theta = 1e6 ** (-2 * torch.arange(d//2, dtype=torch.float32, device=device) / d)
+            self.theta = self.base ** (-2 * torch.arange(d//2, dtype=torch.float32, device=device) / d)
             ms = torch.arange(seq_length, device=device)
             angles = torch.einsum('i,j->ij', ms, self.theta)
             self.cos_cache = torch.cos(angles)
@@ -23,7 +24,7 @@ class RoPE:
 
         needed_dhalf = d // 2
         if d != self.cached_d:
-            self.theta = 1e6 ** (-2 * torch.arange(needed_dhalf, dtype=torch.float32, device=device) / d)
+            self.theta = self.base ** (-2 * torch.arange(needed_dhalf, dtype=torch.float32, device=device) / d)
             ms = torch.arange(self.cached_seq, device=device)
             angles = torch.einsum('i,j->ij', ms, self.theta)
             self.cos_cache = torch.cos(angles)

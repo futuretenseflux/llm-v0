@@ -8,7 +8,7 @@ from typing import Union, List, Optional
 
 def load_config():
     """Load configuration from YAML file."""
-    config_path = Path(__file__).parent.parent.parent.parent / "configs" / "datasets.yaml"
+    config_path = Path(__file__).parent.parent.parent.parent / "configs" / "lm.yaml"
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 

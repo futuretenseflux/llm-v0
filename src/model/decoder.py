@@ -1,8 +1,8 @@
 #decoder.py
 import torch
 import torch.nn as nn
-from llm.model.attention import GroupedQueryAttention
-from llm.model.activations import SwiGLU
+from model.attention import GroupedQueryAttention
+from model.activations import SwiGLU
 
 class DecoderLayer(nn.Module):
     def __init__(self, dim_model, dim_k, num_q_heads, group_size, intermediate_size, eps=1e-6, dropout=0.1):

@@ -7,10 +7,16 @@ num_decoder_layers: 28
 intermediate_size: 3072
 eps: 1e-6
 dropout: 0.1
-batch_size: 32
-seq_length: 1024
-num_epochs: 10
 learning_rate: 0.0003
+
+optim_weight_decay: 0.01
+
+batch_size: 256
+seq_length: 1024
+seq_length_long: 16384
+rope_base: 50000
+rope_base_long: 1000000
+
 corpus_split:
   general_web: 0.30
   books: 0.15
@@ -19,3 +25,16 @@ corpus_split:
   math_technical_reasoning: 0.20
   warmup: 0.01
   conversation_forum: 0.05
+
+# Dataset configuration
+tokenizer_model: "facebook/galactica-6.7b"
+output_dir: "data/pretraining/processed"
+
+datasets:
+  books: "sci-datasets/sci-books"
+  code: "sci-datasets/sci-code"
+  conv_forum: "sci-datasets/sci_conversations_v1"
+  math: "sci-datasets/sci-math"
+  papers: "sci-datasets/sci-papers"
+  primer: "sci-datasets/sci-primer-v1"
+  web: "sci-datasets/fineweb-edu-sci-super"

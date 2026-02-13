@@ -1,6 +1,6 @@
 #transformer.py
 import torch.nn as nn
-from llm.model.decoder import DecoderLayer
+from model.decoder import DecoderLayer
 
 class Transformer(nn.Module):
     def __init__(self, vocab_size, dim_model, dim_k, num_q_heads, group_size, num_decoder_layers, intermediate_size, eps=1e-6, dropout=0.1):
