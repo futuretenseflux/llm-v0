@@ -41,7 +41,8 @@ sampler = ProportionSampler(datasets, start_ratios, NUM_SAMPLES)
 print("Sampler created")
 
 BATCH_SIZE = config["batch_size"]
-STEPS = NUM_SAMPLES // BATCH_SIZE
+GRAD_ACCUM_STEPS = int(config.get("grad_accum_steps", 1))
+STEPS = NUM_SAMPLES // (BATCH_SIZE * GRAD_ACCUM_STEPS)
 loader = DataLoader(dataset_combined, BATCH_SIZE, sampler=sampler)
 print("DataLoader created, ", STEPS, " steps", NUM_SAMPLES, " samples")
 
@@ -75,6 +76,7 @@ train_loop(
     log_every=100,
     logger=logger,
     use_amp=True,
+    grad_accum_steps=GRAD_ACCUM_STEPS,
     max_grad_norm=1.0,
     tokens_elapsed=tokens_elapsed,
     total_steps=STEPS,

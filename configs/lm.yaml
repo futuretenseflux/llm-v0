@@ -12,6 +12,7 @@ learning_rate: 0.0003
 optim_weight_decay: 0.01
 
 batch_size: 64
+grad_accum_steps: 1
 seq_length: 1024
 seq_length_long: 16384
 rope_base: 50000

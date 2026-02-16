@@ -10,7 +10,7 @@ from ..data.pretraining.training.sampling_ratio_generator import get_sampling_ra
 
 def train_loop(
     model, train_loader, optimizer, device, scheduler=None, sampler=None, max_grad_norm=None, log_every=100, logger: TrainLogger | None = None,
-    use_amp: bool = True, tokens_elapsed: int = 0, total_steps: int = 0, checkpoint_dir: str = "checkpoints"
+    use_amp: bool = True, tokens_elapsed: int = 0, total_steps: int = 0, checkpoint_dir: str = "checkpoints", grad_accum_steps: int = 1
 ):
     model.train()
     global_step = 0
@@ -23,25 +23,34 @@ def train_loop(
         # scaler = amp.GradScaler(enabled=True)
         pass
 
+    if grad_accum_steps < 1:
+        raise ValueError("grad_accum_steps must be >= 1")
+
+    optimizer.zero_grad(set_to_none=True)
+
     for batch_idx, (input_ids, targets) in enumerate(train_loader):
         input_ids, targets = input_ids.to(device), targets.to(device)
-        optimizer.zero_grad(set_to_none=True)
         with torch.autocast(device_type="cuda" if "cuda" in str(device).lower() else "cpu", dtype=torch.bfloat16, enabled=use_amp):
             logits = model(input_ids)
             loss = cross_entropy_shifted(logits=logits, targets=targets)
+            loss = loss / grad_accum_steps
         if scaler is not None:
             scaler.scale(loss).backward()
         else:
             loss.backward()
-        if max_grad_norm is not None:
-            clip_grad_norm(model, max_grad_norm)
-        if scaler is not None:
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            optimizer.step()
-        if scheduler is not None:
-            scheduler.step()
+
+        is_accum_boundary = ((batch_idx + 1) % grad_accum_steps) == 0
+        if is_accum_boundary:
+            if max_grad_norm is not None:
+                clip_grad_norm(model, max_grad_norm)
+            if scaler is not None:
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
+            if scheduler is not None:
+                scheduler.step()
         if sampler is not None:
             new_probs = get_sampling_ratios(tokens_elapsed)
             sampler.set_probs(new_probs)
@@ -50,19 +59,20 @@ def train_loop(
         tokens_elapsed += batch_tokens
         
         total_loss += loss.item()
-        if logger is not None and batch_idx % log_every == 0:
-            print("Batch", batch_idx, "loss:", loss.item())
+        if logger is not None and is_accum_boundary and global_step % log_every == 0:
+            print("Step", global_step, "loss:", loss.item())
             logger.log_batch(batch_idx=batch_idx, loss_value=loss.item(), step=global_step)
         
         # Checkpoint saving every 20k steps
         checkpoint_interval_steps = 20000  # 20 thousand steps
-        if global_step > 0 and global_step % checkpoint_interval_steps == 0:
+        if is_accum_boundary and global_step > 0 and global_step % checkpoint_interval_steps == 0:
             checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_{tokens_elapsed//1_000_000_000}B_{tokens_elapsed%1_000_000_000}M.pt")
             save_checkpoint(model, optimizer, scheduler, tokens_elapsed, global_step, checkpoint_path)
             if logger is not None:
                 logger.log_info(f"Checkpoint saved at step {global_step} with {tokens_elapsed//1_000_000_000}B tokens: {checkpoint_path}")
-        
-        global_step += 1
+
+        if is_accum_boundary:
+            global_step += 1
 
 def save_checkpoint(model, optimizer, scheduler, tokens_elapsed, global_step, checkpoint_path):
     """Save model checkpoint with all necessary state."""

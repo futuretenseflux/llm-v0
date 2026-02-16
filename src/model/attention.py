@@ -1,7 +1,7 @@
 #attention.py
 import torch
 import torch.nn as nn
-import math
+import torch.nn.functional as F
 from src.model.pe import RoPE
 import yaml
 
@@ -48,15 +48,14 @@ class GroupedQueryAttention(nn.Module):
         q = self.q_norm(q)
         k = self.k_norm(k)
 
-        q = q.view(batch_size, self.num_kv_heads, self.group_size, seq_length, self.dim_k)
-        k = k.transpose(-1,-2).unsqueeze(2)
-        scores = torch.matmul(q,k) / math.sqrt(self.dim_k)
+        if self.group_size != 1:
+            k = k.repeat_interleave(self.group_size, dim=1)
+            v = v.repeat_interleave(self.group_size, dim=1)
+
         if mask is not None:
-            scores = scores.masked_fill(mask == 0, float('-inf'))
-        attn_weights = nn.functional.softmax(scores, dim=-1)
-        attn_weights = self.dropout(attn_weights)
-        v = v.unsqueeze(2)
-        out = torch.matmul(attn_weights, v)
-        out = out.contiguous().view(batch_size, self.num_q_heads, seq_length, self.dim_k)
-        out = self.fc(out.transpose(1,2).contiguous().view(batch_size, seq_length, self.num_q_heads * self.dim_k))
+            raise ValueError("GroupedQueryAttention.forward no longer accepts an explicit `mask`; use is_causal=True")
+
+        dropout_p = self.dropout.p if self.training else 0.0
+        out = F.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=dropout_p, is_causal=True)
+        out = self.fc(out.transpose(1, 2).contiguous().view(batch_size, seq_length, self.num_q_heads * self.dim_k))
         return out

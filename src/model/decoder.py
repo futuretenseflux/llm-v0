@@ -27,10 +27,8 @@ class DecoderLayer(nn.Module):
 
     def forward(self, x):
         batch_size, seq_length = x.shape[:2]
-        mask = torch.tril(torch.ones(seq_length, seq_length, device=x.device)).bool()
-        mask = mask[None, None, None, :, :]
         norm1 = self.rms_norm_1(x)
-        context = self.gq_attn(norm1, mask=mask)
+        context = self.gq_attn(norm1)
         context = self.attention_dropout(context)
         x = context + x
         norm2 = self.rms_norm_2(x)
