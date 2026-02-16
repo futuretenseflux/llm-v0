@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 import math
-from model.pe import RoPE
+from src.model.pe import RoPE
 import yaml
 
 with open("configs/lm.yaml", "r") as f:

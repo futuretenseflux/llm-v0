@@ -15,13 +15,13 @@ def train_loop(
     model.train()
     global_step = 0
     total_loss = 0.0
-    epoch = 0
     scaler = None
     
     # Create checkpoint directory
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
     if use_amp and "cuda" in str(device).lower():
-        scaler = amp.GradScaler(enabled=True)
+        # scaler = amp.GradScaler(enabled=True)
+        pass
 
     for batch_idx, (input_ids, targets) in enumerate(train_loader):
         input_ids, targets = input_ids.to(device), targets.to(device)
@@ -51,7 +51,8 @@ def train_loop(
         
         total_loss += loss.item()
         if logger is not None and batch_idx % log_every == 0:
-            logger.log_batch(epoch=epoch + 1, batch_idx=batch_idx, loss_value=loss.item(), step=global_step)
+            print("Batch", batch_idx, "loss:", loss.item())
+            logger.log_batch(batch_idx=batch_idx, loss_value=loss.item(), step=global_step)
         
         # Checkpoint saving every 20k steps
         checkpoint_interval_steps = 20000  # 20 thousand steps

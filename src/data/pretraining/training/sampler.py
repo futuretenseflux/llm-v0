@@ -1,5 +1,6 @@
 from torch.utils.data import Sampler
 import torch
+from .sampling_ratio_generator import DATASET_ORDER
 
 class ProportionSampler(Sampler):
     def __init__(self, datasets, probs, num_samples):
@@ -14,7 +15,7 @@ class ProportionSampler(Sampler):
 
     def __iter__(self):
         for _ in range(self.num_samples):
-            d = torch.multinomial(torch.tensor(self.probs), 1).item()
+            d = torch.multinomial(torch.tensor([self.probs[dataset] for dataset in DATASET_ORDER]), 1).item()
             i = torch.randint(self.lengths[d], (1,)).item()
             yield self.offsets[d] + i
     

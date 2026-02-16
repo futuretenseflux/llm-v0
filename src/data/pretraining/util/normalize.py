@@ -51,12 +51,3 @@ def clean_scientific_text(text: str) -> str:
     text = "\n".join(line.rstrip() for line in text.splitlines())
 
     return text
-
-# --- Example Usage ---
-raw_data = "Let x&sup2; &plusmn; y&sup2; = z&sup2;.   \nFind the solution in &reals;.\n\tprint(\"Done\")"
-cleaned = clean_scientific_text(raw_data)
-print(cleaned)
-# Output:
-# Let x² ± y² = z².
-# Find the solution in ℝ.
-#     print("Done")

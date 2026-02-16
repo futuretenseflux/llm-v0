@@ -1,6 +1,7 @@
 #transformer.py
 import torch.nn as nn
-from model.decoder import DecoderLayer
+import torch
+from src.model.decoder import DecoderLayer
 
 class Transformer(nn.Module):
     def __init__(self, vocab_size, dim_model, dim_k, num_q_heads, group_size, num_decoder_layers, intermediate_size, eps=1e-6, dropout=0.1):
@@ -25,6 +26,7 @@ class Transformer(nn.Module):
                 nn.init.normal_(module.weight, mean=0.0, std=0.02)
             elif isinstance(module, nn.RMSNorm):
                 nn.init.ones_(module.weight)
+                module.weight.data = module.weight.data.to(torch.bfloat16)
 
     def forward(self, input_ids):
         x = self.token_embedding(input_ids)

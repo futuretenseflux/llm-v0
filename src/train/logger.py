@@ -9,8 +9,8 @@ class TrainLogger:
         self.run = wandb.init(project=project, name=run_name, config=config, mode=mode)
         self.start_time = time.time()
 
-    def log_batch(self, epoch: int, batch_idx: int, loss_value: float, step: int):
-        wandb.log({"train/loss": loss_value, "train/epoch": epoch, "train/batch": batch_idx}, step=step)
+    def log_batch(self, batch_idx: int, loss_value: float, step: int):
+        wandb.log({"train/loss": loss_value, "train/batch": batch_idx}, step=step)
 
     def finish(self):
         if self.run is not None:

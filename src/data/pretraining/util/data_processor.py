@@ -4,53 +4,104 @@ from datasets import load_dataset, Dataset, concatenate_datasets
 from transformers import AutoTokenizer
 import array
 from typing import Union, List, Optional
+import os
+from .normalize import clean_scientific_text
+import numpy as np
 
+_tokenizer = None
 
 def load_config():
-    """Load configuration from YAML file."""
-    config_path = Path(__file__).parent.parent.parent.parent / "configs" / "lm.yaml"
+    config_path = Path(__file__).parent.parent.parent.parent.parent / "configs" / "lm.yaml"
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
+def tokenize_batch(batch, tokenizer_name):
+    global _tokenizer
 
-def process_tokenize_save(dataset: Dataset, output_prefix: str, output_dir: str, tokenizer_name: str = "facebook/galactica-6.7b", buffer_size: int = 100_000_000):
-    """
-    Process, tokenize and save a dataset to binary files.
-    
-    Args:
-        dataset: The dataset to process
-        output_prefix: Prefix for output binary files (e.g., 'books', 'code')
-        output_dir: Directory to save the processed binary files
-        tokenizer_name: Name of the tokenizer to use
-        buffer_size: Number of tokens to buffer before writing to file
-    """
-    import os
-    
-    # Create output directory if it doesn't exist
+    if _tokenizer is None:
+        _tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, use_fast=True)
+
+    texts = [clean_scientific_text(t) for t in batch["text"]]
+    tokens = _tokenizer(texts, add_special_tokens=False)
+
+    eos = _tokenizer.eos_token_id or 2
+
+    return {
+        "ids": [ids + [eos] for ids in tokens["input_ids"]]
+    }
+
+def tokenize_dataset(dataset, tokenizer_name):
+    dataset = dataset.map(
+        tokenize_batch,
+        batched=True,
+        batch_size=1000,
+        num_proc=max(1, int(os.cpu_count() * 0.8)),
+        fn_kwargs={"tokenizer_name": tokenizer_name},
+        remove_columns=dataset.column_names,
+    )
+    return dataset
+
+def write_tokenized_dataset(
+    dataset,
+    output_dir,
+    output_prefix: str,
+    shard_size_tokens=500_000_000,
+    dtype=np.uint16,
+):
     os.makedirs(output_dir, exist_ok=True)
-    
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+
     shard = 0
-    buffer = array.array('H')
+    token_count = 0
 
-    for example in dataset:
-        if len(buffer) >= buffer_size:
-            output_path = os.path.join(output_dir, f"{output_prefix}_{shard}.bin")
-            with open(output_path, "wb") as f:
-                buffer.tofile(f)
-            buffer = array.array('H')
-            shard += 1
+    output_path = os.path.join(output_dir, f"{output_prefix}_{shard}.bin")
+    f = open(output_path, "wb", buffering=1024*1024*64)  # 64MB buffer
 
-        from .normalize import clean_scientific_text
-        normalized = clean_scientific_text(example['text'])
-        tokenized_ids = tokenizer.encode(normalized, add_special_tokens=False)
-        buffer.extend(tokenized_ids)
-        buffer.append(tokenizer.eos_token_id)
+    try:
+        for example in dataset:
+            arr = np.asarray(example["ids"], dtype=dtype)
+            arr.tofile(f)
+            token_count += arr.size
 
-    if buffer:
-        output_path = os.path.join(output_dir, f"{output_prefix}_{shard}.bin")
-        with open(output_path, "wb") as f:
-            buffer.tofile(f)
+            if token_count >= shard_size_tokens:
+                f.close()
+                shard += 1
+                token_count = 0
+
+                output_path = os.path.join(output_dir, f"{output_prefix}_{shard}.bin")
+                f = open(output_path, "wb", buffering=1024*1024*64)
+
+    finally:
+        f.close()
+
+
+# def write_tokenized_dataset(dataset, output_dir, output_prefix: str, shard_size_tokens=500_000_000, dtype=np.uint16):
+#     os.makedirs(output_dir, exist_ok=True)
+
+#     shard = 0
+#     token_buffer = []
+#     token_count = 0
+
+#     for example in dataset:
+#         ids = example["ids"]
+#         token_buffer.extend(ids)
+#         token_count += len(ids)
+
+#         if token_count >= shard_size_tokens:
+#             write_shard(token_buffer, output_prefix, output_dir, shard, dtype)
+#             shard  += 1
+#             token_buffer = []
+#             token_count = 0
+        
+#     if token_buffer:
+#         write_shard(token_buffer, output_prefix, output_dir, shard, dtype)
+
+# def write_shard(buffers, prefix, output_dir, shard_id, dtype):
+#     output_path = os.path.join(output_dir, f"{prefix}_{shard_id}.bin")
+
+#     arr = np.asarray(buffers, dtype=dtype)
+
+#     with open(output_path, "wb") as f:
+#         arr.tofile(f)
 
 
 def load_and_process_dataset(
@@ -63,25 +114,10 @@ def load_and_process_dataset(
     concatenate_datasets_list: Optional[List[str]] = None,
     tokenizer_name: Optional[str] = None
 ):
-    """
-    Load dataset(s), optionally concatenate, shuffle, and process.
-    
-    Args:
-        dataset_key: Key for the dataset in config (e.g., 'books', 'code')
-        output_prefix: Prefix for output binary files (defaults to dataset_key)
-        output_dir: Directory to save processed files (from config if not provided)
-        split: Dataset split to use
-        shuffle_seed: Seed for shuffling
-        subset: Optional subset name for the dataset
-        concatenate_datasets_list: List of additional dataset subsets to concatenate
-        tokenizer_name: Name of the tokenizer to use (from config if not provided)
-    """
     config = load_config()
     
-    # Get dataset name from config
     dataset_name = config['datasets'][dataset_key]
     
-    # Use config values if not provided
     if tokenizer_name is None:
         tokenizer_name = config.get('tokenizer_model', 'facebook/galactica-6.7b')
     if output_prefix is None:
@@ -99,4 +135,5 @@ def load_and_process_dataset(
         dataset = load_dataset(dataset_name, subset, split=split) if subset else load_dataset(dataset_name, split=split)
     
     dataset = dataset.shuffle(seed=shuffle_seed)
-    process_tokenize_save(dataset, output_prefix, output_dir, tokenizer_name)
+    tokenized_normalized_suffixed = tokenize_dataset(dataset, tokenizer_name)
+    write_tokenized_dataset(tokenized_normalized_suffixed, output_dir, output_prefix, shard_size_tokens=500_000_000, dtype=np.uint16)
