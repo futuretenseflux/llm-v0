@@ -74,36 +74,6 @@ def write_tokenized_dataset(
         f.close()
 
 
-# def write_tokenized_dataset(dataset, output_dir, output_prefix: str, shard_size_tokens=500_000_000, dtype=np.uint16):
-#     os.makedirs(output_dir, exist_ok=True)
-
-#     shard = 0
-#     token_buffer = []
-#     token_count = 0
-
-#     for example in dataset:
-#         ids = example["ids"]
-#         token_buffer.extend(ids)
-#         token_count += len(ids)
-
-#         if token_count >= shard_size_tokens:
-#             write_shard(token_buffer, output_prefix, output_dir, shard, dtype)
-#             shard  += 1
-#             token_buffer = []
-#             token_count = 0
-        
-#     if token_buffer:
-#         write_shard(token_buffer, output_prefix, output_dir, shard, dtype)
-
-# def write_shard(buffers, prefix, output_dir, shard_id, dtype):
-#     output_path = os.path.join(output_dir, f"{prefix}_{shard_id}.bin")
-
-#     arr = np.asarray(buffers, dtype=dtype)
-
-#     with open(output_path, "wb") as f:
-#         arr.tofile(f)
-
-
 def load_and_process_dataset(
     dataset_key: str,
     output_prefix: Optional[str] = None,
