@@ -42,6 +42,7 @@ print("Sampler created")
 
 BATCH_SIZE = config["batch_size"]
 GRAD_ACCUM_STEPS = int(config.get("grad_accum_steps", 1))
+MICRO_BATCH_SIZE = config.get("micro_batch_size", None)
 STEPS = NUM_SAMPLES // (BATCH_SIZE * GRAD_ACCUM_STEPS)
 loader = DataLoader(dataset_combined, BATCH_SIZE, sampler=sampler)
 print("DataLoader created, ", STEPS, " steps", NUM_SAMPLES, " samples")
@@ -57,7 +58,7 @@ model = Transformer(
     eps=float(config["eps"]),
     dropout=float(config["dropout"])
 )
-model = model.to("cuda")
+model = model.to(device="cuda", dtype=__import__("torch").bfloat16)
 print("Model created")
 
 optimizer = build_optimizer(model, config["learning_rate"], config["optim_weight_decay"])
@@ -77,6 +78,7 @@ train_loop(
     logger=logger,
     use_amp=True,
     grad_accum_steps=GRAD_ACCUM_STEPS,
+    micro_batch_size=MICRO_BATCH_SIZE,
     max_grad_norm=1.0,
     tokens_elapsed=tokens_elapsed,
     total_steps=STEPS,

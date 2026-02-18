@@ -10,7 +10,8 @@ from ..data.pretraining.training.sampling_ratio_generator import get_sampling_ra
 
 def train_loop(
     model, train_loader, optimizer, device, scheduler=None, sampler=None, max_grad_norm=None, log_every=100, logger: TrainLogger | None = None,
-    use_amp: bool = True, tokens_elapsed: int = 0, total_steps: int = 0, checkpoint_dir: str = "checkpoints", grad_accum_steps: int = 1
+    use_amp: bool = True, tokens_elapsed: int = 0, total_steps: int = 0, checkpoint_dir: str = "checkpoints", grad_accum_steps: int = 1,
+    micro_batch_size: int | None = None
 ):
     model.train()
     global_step = 0
@@ -30,14 +31,27 @@ def train_loop(
 
     for batch_idx, (input_ids, targets) in enumerate(train_loader):
         input_ids, targets = input_ids.to(device), targets.to(device)
-        with torch.autocast(device_type="cuda" if "cuda" in str(device).lower() else "cpu", dtype=torch.bfloat16, enabled=use_amp):
-            logits = model(input_ids)
-            loss = cross_entropy_shifted(logits=logits, targets=targets)
-            loss = loss / grad_accum_steps
-        if scaler is not None:
-            scaler.scale(loss).backward()
-        else:
-            loss.backward()
+
+        batch_size = int(input_ids.size(0))
+        mb = int(micro_batch_size) if micro_batch_size is not None else batch_size
+        if mb < 1:
+            raise ValueError("micro_batch_size must be >= 1")
+
+        num_micro = (batch_size + mb - 1) // mb
+        for micro_start in range(0, batch_size, mb):
+            micro_end = min(batch_size, micro_start + mb)
+            micro_input = input_ids[micro_start:micro_end]
+            micro_targets = targets[micro_start:micro_end]
+
+            with torch.autocast(device_type="cuda" if "cuda" in str(device).lower() else "cpu", dtype=torch.bfloat16, enabled=use_amp):
+                logits = model(micro_input)
+                loss = cross_entropy_shifted(logits=logits, targets=micro_targets)
+                loss = loss / (grad_accum_steps * num_micro)
+
+            if scaler is not None:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
 
         is_accum_boundary = ((batch_idx + 1) % grad_accum_steps) == 0
         if is_accum_boundary:
