@@ -26,8 +26,14 @@ class BinaryTokenDataset(Dataset):
         input_np = self._slice(start, end)
         target_np = self._slice(start + 1, end + 1)
 
-        input_ids = torch.from_numpy(input_np).long()
-        targets = torch.from_numpy(target_np).long()  # Shifted by 1
+        if input_np.size != self.seq_length or target_np.size != self.seq_length:
+            raise ValueError(
+                f"Expected slices of length {self.seq_length}, got input={int(input_np.size)} target={int(target_np.size)} "
+                f"(idx={int(idx)} start={int(start)} end={int(end)})"
+            )
+
+        input_ids = torch.from_numpy(np.array(input_np, copy=True)).long()
+        targets = torch.from_numpy(np.array(target_np, copy=True)).long()  # Shifted by 1
         return input_ids, targets
 
     def _slice(self, start: int, end: int) -> np.ndarray:
