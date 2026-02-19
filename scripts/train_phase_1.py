@@ -1,4 +1,5 @@
 import yaml
+import torch
 
 from src.data.pretraining.training.dataset import BinaryTokenDataset
 from src.data.pretraining.training.sampler import ProportionSampler
@@ -68,7 +69,8 @@ model = Transformer(
     eps=float(config["eps"]),
     dropout=float(config["dropout"])
 )
-model = model.to(device="cuda", dtype=__import__("torch").bfloat16)
+model = model.to(device="cuda", dtype=torch.bfloat16)
+model = torch.compile(model, mode="max-autotune")
 print("Model created")
 
 optimizer = build_optimizer(model, config["learning_rate"], config["optim_weight_decay"])

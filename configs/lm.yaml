@@ -12,7 +12,7 @@ learning_rate: 0.0003
 optim_weight_decay: 0.01
 
 batch_size: 256
-micro_batch_size: 24
+micro_batch_size: 28
 grad_accum_steps: 1
 seq_length: 1024
 seq_length_long: 16384
