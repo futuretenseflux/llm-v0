@@ -31,6 +31,7 @@ def train_loop(
         raise ValueError("grad_accum_steps must be >= 1")
 
     optimizer.zero_grad(set_to_none=True)
+    mark_step_begin = getattr(getattr(torch, "compiler", None), "cudagraph_mark_step_begin", None)
 
     for batch_idx, (input_ids, targets) in enumerate(train_loader):
         input_ids = input_ids.to(device, non_blocking=True)
@@ -51,13 +52,19 @@ def train_loop(
                 if (not sdpa_flash_probe_done) and (sdp_kernel is not None) and ("cuda" in str(device).lower()):
                     try:
                         with sdp_kernel(enable_flash=True, enable_mem_efficient=False, enable_math=False):
+                            if mark_step_begin is not None:
+                                mark_step_begin()
                             logits = model(micro_input)
                         print("SDPA FlashAttention probe: usable (Flash forced for 1 forward pass)")
                     except Exception as e:
                         print(f"SDPA FlashAttention probe: NOT usable (Flash forced) | {type(e).__name__}: {e}")
+                        if mark_step_begin is not None:
+                            mark_step_begin()
                         logits = model(micro_input)
                     sdpa_flash_probe_done = True
                 else:
+                    if mark_step_begin is not None:
+                        mark_step_begin()
                     logits = model(micro_input)
                 loss = cross_entropy_shifted(logits=logits, targets=micro_targets)
                 loss = loss / (grad_accum_steps * num_micro)
