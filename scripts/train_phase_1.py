@@ -44,7 +44,17 @@ BATCH_SIZE = config["batch_size"]
 GRAD_ACCUM_STEPS = int(config.get("grad_accum_steps", 1))
 MICRO_BATCH_SIZE = config.get("micro_batch_size", None)
 STEPS = NUM_SAMPLES // (BATCH_SIZE * GRAD_ACCUM_STEPS)
-loader = DataLoader(dataset_combined, BATCH_SIZE, sampler=sampler)
+
+loader = DataLoader(
+    dataset_combined,
+    batch_size=BATCH_SIZE,
+    sampler=sampler,
+    num_workers=16,
+    pin_memory=True,
+    persistent_workers=True,
+    prefetch_factor=2
+)
+
 print("DataLoader created, ", STEPS, " steps", NUM_SAMPLES, " samples")
 
 model = Transformer(
@@ -74,7 +84,7 @@ train_loop(
     sampler=sampler,
     device="cuda",
     scheduler=scheduler,
-    log_every=100,
+    log_every=10,
     logger=logger,
     use_amp=True,
     grad_accum_steps=GRAD_ACCUM_STEPS,
