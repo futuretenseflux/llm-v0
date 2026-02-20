@@ -20,7 +20,7 @@ class RoPE:
             self.cached_d = d
             self.cached_seq = seq_length
             needed_dhalf = d // 2
-            return self.cos_cache[:seq_length, :needed_dhalf], self.sin_cache[:seq_length, :needed_dhalf]
+            return self.cos_cache[:seq_length, :needed_dhalf].clone(), self.sin_cache[:seq_length, :needed_dhalf].clone()
 
         needed_dhalf = d // 2
         if d != self.cached_d:
@@ -40,7 +40,7 @@ class RoPE:
             self.sin_cache = torch.cat([self.sin_cache, new_sin], dim=0)
             self.cached_seq = seq_length
 
-        return self.cos_cache[:seq_length, :needed_dhalf], self.sin_cache[:seq_length, :needed_dhalf]
+        return self.cos_cache[:seq_length, :needed_dhalf].clone(), self.sin_cache[:seq_length, :needed_dhalf].clone()
 
     def apply(self, t):
         seq_length, d = t.shape[-2:]

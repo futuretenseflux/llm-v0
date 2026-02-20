@@ -71,7 +71,6 @@ model = Transformer(
     dropout=float(config["dropout"])
 )
 model = model.to(device="cuda", dtype=torch.bfloat16)
-os.environ.setdefault("TORCHINDUCTOR_CUDAGRAPHS", "0")
 model = torch.compile(model, mode="max-autotune")
 print("Model created")
 
