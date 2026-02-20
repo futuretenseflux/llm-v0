@@ -12,33 +12,36 @@ class RoPE:
 
     def get_rot_cached(self, d, seq_length, device):
         if self.cos_cache is None:
-            self.theta = self.base ** (-2 * torch.arange(d//2, dtype=torch.float32, device=device) / d)
-            ms = torch.arange(seq_length, device=device)
-            angles = torch.einsum('i,j->ij', ms, self.theta)
-            self.cos_cache = torch.cos(angles)
-            self.sin_cache = torch.sin(angles)
-            self.cached_d = d
-            self.cached_seq = seq_length
+            with torch.no_grad():
+                self.theta = self.base ** (-2 * torch.arange(d//2, dtype=torch.float32, device=device) / d)
+                ms = torch.arange(seq_length, device=device)
+                angles = torch.einsum('i,j->ij', ms, self.theta)
+                self.cos_cache = torch.cos(angles).detach()
+                self.sin_cache = torch.sin(angles).detach()
+                self.cached_d = d
+                self.cached_seq = seq_length
             needed_dhalf = d // 2
             return self.cos_cache[:seq_length, :needed_dhalf].clone(), self.sin_cache[:seq_length, :needed_dhalf].clone()
 
         needed_dhalf = d // 2
         if d != self.cached_d:
-            self.theta = self.base ** (-2 * torch.arange(needed_dhalf, dtype=torch.float32, device=device) / d)
-            ms = torch.arange(self.cached_seq, device=device)
-            angles = torch.einsum('i,j->ij', ms, self.theta)
-            self.cos_cache = torch.cos(angles)
-            self.sin_cache = torch.sin(angles)
-            self.cached_d = d
+            with torch.no_grad():
+                self.theta = self.base ** (-2 * torch.arange(needed_dhalf, dtype=torch.float32, device=device) / d)
+                ms = torch.arange(self.cached_seq, device=device)
+                angles = torch.einsum('i,j->ij', ms, self.theta)
+                self.cos_cache = torch.cos(angles).detach()
+                self.sin_cache = torch.sin(angles).detach()
+                self.cached_d = d
 
         if seq_length > self.cached_seq:
-            new_ms = torch.arange(self.cached_seq, seq_length, dtype=torch.float32, device=device)
-            new_angles = torch.einsum('i,j->ij', new_ms, self.theta)
-            new_cos = torch.cos(new_angles)
-            new_sin = torch.sin(new_angles)
-            self.cos_cache = torch.cat([self.cos_cache, new_cos], dim=0)
-            self.sin_cache = torch.cat([self.sin_cache, new_sin], dim=0)
-            self.cached_seq = seq_length
+            with torch.no_grad():
+                new_ms = torch.arange(self.cached_seq, seq_length, dtype=torch.float32, device=device)
+                new_angles = torch.einsum('i,j->ij', new_ms, self.theta)
+                new_cos = torch.cos(new_angles).detach()
+                new_sin = torch.sin(new_angles).detach()
+                self.cos_cache = torch.cat([self.cos_cache, new_cos], dim=0).detach()
+                self.sin_cache = torch.cat([self.sin_cache, new_sin], dim=0).detach()
+                self.cached_seq = seq_length
 
         return self.cos_cache[:seq_length, :needed_dhalf].clone(), self.sin_cache[:seq_length, :needed_dhalf].clone()
 
