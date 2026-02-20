@@ -47,6 +47,7 @@ def train_loop(
             raise ValueError("micro_batch_size must be >= 1")
 
         num_micro = (batch_size + mb - 1) // mb
+        batch_loss = 0.0
         for micro_start in range(0, batch_size, mb):
             micro_end = min(batch_size, micro_start + mb)
             micro_input = input_ids[micro_start:micro_end]
@@ -70,14 +71,16 @@ def train_loop(
                     if mark_step_begin is not None:
                         mark_step_begin()
                     logits = model(micro_input)
-                loss = cross_entropy_shifted(logits=logits, targets=micro_targets)
-                loss = loss / (grad_accum_steps * num_micro)
+                loss_micro = cross_entropy_shifted(logits=logits, targets=micro_targets)
+                batch_loss += loss_micro.item()
+                loss = loss_micro / (grad_accum_steps * num_micro)
 
             if scaler is not None:
                 scaler.scale(loss).backward()
             else:
                 loss.backward()
 
+        avg_batch_loss = batch_loss / num_micro
         is_accum_boundary = ((batch_idx + 1) % grad_accum_steps) == 0
         if is_accum_boundary:
             if max_grad_norm is not None:
@@ -97,9 +100,9 @@ def train_loop(
         batch_tokens = input_ids.numel()  # total tokens in batch
         tokens_elapsed += batch_tokens
         
-        total_loss += loss.item()
+        total_loss += avg_batch_loss
         if logger is not None and is_accum_boundary and global_step % log_every == 0:
-            logger.log_train_step(batch_idx=batch_idx, loss_value=loss.item(), step=global_step, total_steps=total_steps)
+            logger.log_train_step(batch_idx=batch_idx, loss_value=avg_batch_loss, step=global_step, total_steps=total_steps)
         
         if is_accum_boundary:
             checkpoint_path = maybe_save_checkpoint(
