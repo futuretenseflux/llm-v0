@@ -71,7 +71,7 @@ model = Transformer(
     dropout=float(config["dropout"])
 )
 model = model.to(device="cuda", dtype=torch.bfloat16)
-model = torch.compile(model, mode="max-autotune", options={"triton.cudagraphs": False})
+model = torch.compile(model, options={"triton.cudagraphs": False})
 print("Model created")
 
 optimizer = build_optimizer(model, config["learning_rate"], config["optim_weight_decay"])
