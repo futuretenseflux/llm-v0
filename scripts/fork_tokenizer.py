@@ -43,7 +43,11 @@ def main() -> None:
         "<|/think|>",
     ]
 
-    additional_special_tokens = list(tokenizer.additional_special_tokens)
+    existing_additional_special_tokens = tokenizer.special_tokens_map.get(
+        "additional_special_tokens", []
+    )
+
+    additional_special_tokens = list(existing_additional_special_tokens)
     for t in reserved_control_tokens:
         if t not in additional_special_tokens:
             additional_special_tokens.append(t)
@@ -54,7 +58,9 @@ def main() -> None:
     if target_vocab_size > len(tokenizer):
         extra = target_vocab_size - len(tokenizer)
         padding_tokens = [f"<|reserved_special_token_{i}|>" for i in range(extra)]
-        additional_special_tokens = list(tokenizer.additional_special_tokens)
+        additional_special_tokens = list(
+            tokenizer.special_tokens_map.get("additional_special_tokens", [])
+        )
         additional_special_tokens.extend(padding_tokens)
         tokenizer.add_special_tokens({"additional_special_tokens": additional_special_tokens})
 
