@@ -3,6 +3,7 @@ import yaml
 import torch
 
 from src.data.pretraining.training.dataset import BinaryTokenDataset
+from src.data.pretraining.training.fim import FIMDataset
 from src.data.pretraining.training.sampler import ProportionSampler
 from src.data.pretraining.training.sampling_ratio_generator import DATASET_ORDER, get_sampling_ratios
 from src.model.transformer import Transformer
@@ -10,6 +11,7 @@ from torch.utils.data import DataLoader, ConcatDataset
 from src.train.logger import TrainLogger
 from src.train.loop import train_loop
 from src.train.optim import build_optimizer_muon, build_scheduler
+from transformers import AutoTokenizer
 
 with open("configs/lm.yaml", "r") as f:
     config = yaml.safe_load(f)
@@ -19,9 +21,27 @@ output_dir = config["output_dir"]
 SEQ_LENGTH = config["seq_length"]
 STRIDE = config.get("stride", None)
 
+tokenizer = AutoTokenizer.from_pretrained(config["tokenizer_model"], use_fast=True)
+fim_prefix_id = tokenizer.convert_tokens_to_ids("<|fim_prefix|>")
+fim_middle_id = tokenizer.convert_tokens_to_ids("<|fim_middle|>")
+fim_suffix_id = tokenizer.convert_tokens_to_ids("<|fim_suffix|>")
+
+if any(tid is None or int(tid) < 0 for tid in [fim_prefix_id, fim_middle_id, fim_suffix_id]):
+    raise ValueError("FIM special tokens not found in tokenizer. Did you run scripts/fork_tokenizer.py?")
+
+fim_prob_code = float(config.get("fim_prob_code", 0.5))
+
 dataset_dict = {
     "books" : BinaryTokenDataset(output_dir, "books", SEQ_LENGTH, STRIDE),
-    "code" : BinaryTokenDataset(output_dir, "code", SEQ_LENGTH, STRIDE),
+    "code" : FIMDataset(
+        BinaryTokenDataset(output_dir, "code", SEQ_LENGTH, STRIDE),
+        seq_length=SEQ_LENGTH,
+        fim_prefix_id=fim_prefix_id,
+        fim_middle_id=fim_middle_id,
+        fim_suffix_id=fim_suffix_id,
+        fim_prob=fim_prob_code,
+        rng_seed=42,
+    ),
     "conv_forum" : BinaryTokenDataset(output_dir, "conv_forum", SEQ_LENGTH, STRIDE),
     "math" : BinaryTokenDataset(output_dir, "math", SEQ_LENGTH, STRIDE),
     "papers" : BinaryTokenDataset(output_dir, "papers", SEQ_LENGTH, STRIDE),

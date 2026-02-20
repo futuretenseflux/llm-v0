@@ -1,4 +1,4 @@
-vocab_size: 50000
+vocab_size: 50176 # padded to multiple of 128
 dim_model: 1024
 dim_k: 128
 num_q_heads: 16
@@ -9,6 +9,8 @@ eps: 1e-6
 dropout: 0.1
 learning_rate: 0.0003
 muon_lr: 0.02
+
+fim_prob_code: 0.3
 
 optim_weight_decay: 0.01
 
@@ -30,7 +32,7 @@ corpus_split:
   conversation_forum: 0.05
 
 # Dataset configuration
-tokenizer_model: "facebook/galactica-6.7b"
+tokenizer_model: "tokenizers/galactica-6.7b-fork"
 output_dir: "data/pretraining/processed"
 
 datasets:
