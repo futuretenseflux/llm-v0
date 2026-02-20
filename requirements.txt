@@ -2,3 +2,4 @@ datasets
 transformers
 wandb
 pyyaml
+git+https://github.com/microsoft/dion.git

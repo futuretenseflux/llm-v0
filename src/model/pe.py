@@ -8,26 +8,28 @@ class RoPE:
         self.theta = None
         self.cached_seq = 0
         self.cached_d = 0
+        self.cached_device = None
         self.base = base
 
     def get_rot_cached(self, d, seq_length, device):
-        if self.cos_cache is None:
+        if self.cos_cache is None or self.cached_device != device:
             with torch.no_grad():
                 self.theta = self.base ** (-2 * torch.arange(d//2, dtype=torch.float32, device=device) / d)
-                ms = torch.arange(seq_length, device=device)
+                ms = torch.arange(seq_length, dtype=torch.float32, device=device)
                 angles = torch.einsum('i,j->ij', ms, self.theta)
                 self.cos_cache = torch.cos(angles).detach()
                 self.sin_cache = torch.sin(angles).detach()
                 self.cached_d = d
                 self.cached_seq = seq_length
+                self.cached_device = device
             needed_dhalf = d // 2
-            return self.cos_cache[:seq_length, :needed_dhalf].clone(), self.sin_cache[:seq_length, :needed_dhalf].clone()
+            return self.cos_cache[:seq_length, :needed_dhalf], self.sin_cache[:seq_length, :needed_dhalf]
 
         needed_dhalf = d // 2
         if d != self.cached_d:
             with torch.no_grad():
                 self.theta = self.base ** (-2 * torch.arange(needed_dhalf, dtype=torch.float32, device=device) / d)
-                ms = torch.arange(self.cached_seq, device=device)
+                ms = torch.arange(self.cached_seq, dtype=torch.float32, device=device)
                 angles = torch.einsum('i,j->ij', ms, self.theta)
                 self.cos_cache = torch.cos(angles).detach()
                 self.sin_cache = torch.sin(angles).detach()
@@ -43,11 +45,14 @@ class RoPE:
                 self.sin_cache = torch.cat([self.sin_cache, new_sin], dim=0).detach()
                 self.cached_seq = seq_length
 
-        return self.cos_cache[:seq_length, :needed_dhalf].clone(), self.sin_cache[:seq_length, :needed_dhalf].clone()
+        return self.cos_cache[:seq_length, :needed_dhalf], self.sin_cache[:seq_length, :needed_dhalf]
 
     def apply(self, t):
         seq_length, d = t.shape[-2:]
+        assert d % 2 == 0
         r_cos, r_sin = self.get_rot_cached(d, seq_length, t.device)
+        r_cos = r_cos.to(dtype=t.dtype)
+        r_sin = r_sin.to(dtype=t.dtype)
         t_even = t[..., 0::2]
         t_odd = t[..., 1::2]
         t_conj = torch.empty_like(t)

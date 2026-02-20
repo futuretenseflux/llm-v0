@@ -9,7 +9,7 @@ from src.model.transformer import Transformer
 from torch.utils.data import DataLoader, ConcatDataset
 from src.train.logger import TrainLogger
 from src.train.loop import train_loop
-from src.train.optim import build_optimizer, build_scheduler
+from src.train.optim import build_optimizer_muon, build_scheduler
 
 with open("configs/lm.yaml", "r") as f:
     config = yaml.safe_load(f)
@@ -74,7 +74,12 @@ model = model.to(device="cuda", dtype=torch.bfloat16)
 model = torch.compile(model, options={"triton.cudagraphs": False})
 print("Model created")
 
-optimizer = build_optimizer(model, config["learning_rate"], config["optim_weight_decay"])
+optimizer = build_optimizer_muon(
+    model, 
+    muon_lr=config.get("muon_lr", 0.02),
+    adamw_lr=config["learning_rate"],
+    weight_decay=config["optim_weight_decay"]
+)
 scheduler = build_scheduler(optimizer, STEPS)
 print("Optimizer and scheduler created, starting loop...")
 

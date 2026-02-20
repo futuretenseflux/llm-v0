@@ -8,6 +8,7 @@ intermediate_size: 3072
 eps: 1e-6
 dropout: 0.1
 learning_rate: 0.0003
+muon_lr: 0.02
 
 optim_weight_decay: 0.01
 
