@@ -34,6 +34,7 @@ corpus_split:
 # Dataset configuration
 tokenizer_model: "tokenizers/galactica-6.7b-fork"
 output_dir: "data/pretraining/processed"
+checkpoint_dir: "checkpoints/phase1"
 
 datasets:
   books: "sci-datasets/sci-books"

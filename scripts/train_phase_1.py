@@ -17,6 +17,7 @@ with open("configs/lm.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 output_dir = config["output_dir"]
+checkpoint_dir = config.get("checkpoint_dir", output_dir + "/checkpoints")
 
 SEQ_LENGTH = config["seq_length"]
 STRIDE = config.get("stride", None)
@@ -54,7 +55,7 @@ datasets = [dataset_dict[d] for d in DATASET_ORDER]
 print("All datasets loaded")
 dataset_combined = ConcatDataset(datasets)
 
-TOKEN_BUDGET = 15_000_000_000
+TOKEN_BUDGET = 16_000_000_000
 NUM_SAMPLES = TOKEN_BUDGET // SEQ_LENGTH
 tokens_elapsed = 0
 
@@ -66,6 +67,12 @@ BATCH_SIZE = config["batch_size"]
 GRAD_ACCUM_STEPS = int(config.get("grad_accum_steps", 1))
 MICRO_BATCH_SIZE = config.get("micro_batch_size", None)
 STEPS = NUM_SAMPLES // (BATCH_SIZE * GRAD_ACCUM_STEPS)
+
+checkpoint_steps = set()
+for denom in [1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1]:
+    s = STEPS // denom
+    if s > 0:
+        checkpoint_steps.add(int(s))
 
 loader = DataLoader(
     dataset_combined,
@@ -120,5 +127,6 @@ train_loop(
     max_grad_norm=1.0,
     tokens_elapsed=tokens_elapsed,
     total_steps=STEPS,
-    checkpoint_dir=output_dir + "/checkpoints"
+    checkpoint_dir=checkpoint_dir,
+    checkpoint_steps=checkpoint_steps,
 )

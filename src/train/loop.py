@@ -6,6 +6,7 @@ from .checkpointer import maybe_save_checkpoint
 import torch
 from torch import amp
 from ..data.pretraining.training.sampling_ratio_generator import get_sampling_ratios
+from typing import Optional, Set
 
 try:
     from torch.backends.cuda import sdp_kernel
@@ -15,9 +16,12 @@ except Exception:  # pragma: no cover
 def train_loop(
     model, train_loader, optimizer, device, scheduler=None, sampler=None, max_grad_norm=None, log_every=10, logger: TrainLogger | None = None,
     use_amp: bool = True, tokens_elapsed: int = 0, total_steps: int = 0, checkpoint_dir: str = "checkpoints", grad_accum_steps: int = 1,
-    micro_batch_size: int | None = None
+    micro_batch_size: int | None = None,
+    checkpoint_steps: Optional[Set[int]] = None,
 ):
     model.train()
+    if checkpoint_steps is None:
+        raise ValueError("checkpoint_steps must be provided")
     global_step = 0
     total_loss = 0.0
     scaler = None
@@ -97,8 +101,6 @@ def train_loop(
         if logger is not None and is_accum_boundary and global_step % log_every == 0:
             logger.log_train_step(batch_idx=batch_idx, loss_value=loss.item(), step=global_step, total_steps=total_steps)
         
-        # Checkpoint saving every 20k steps
-        checkpoint_interval_steps = 20000  # 20 thousand steps
         if is_accum_boundary:
             checkpoint_path = maybe_save_checkpoint(
                 model=model,
@@ -107,7 +109,7 @@ def train_loop(
                 tokens_elapsed=tokens_elapsed,
                 global_step=global_step,
                 checkpoint_dir=checkpoint_dir,
-                interval_steps=checkpoint_interval_steps,
+                checkpoint_steps=checkpoint_steps,
             )
             if checkpoint_path is not None and logger is not None:
                 logger.log_info(f"Checkpoint saved at step {global_step} with {tokens_elapsed//1_000_000_000}B tokens: {checkpoint_path}")

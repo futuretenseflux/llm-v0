@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set
 
 import torch
 
@@ -36,12 +36,12 @@ def maybe_save_checkpoint(
     tokens_elapsed: int,
     global_step: int,
     checkpoint_dir: str,
-    interval_steps: int,
+    checkpoint_steps: Set[int],
 ) -> Optional[str]:
-    if interval_steps <= 0:
+    if global_step <= 0:
         return None
 
-    if global_step <= 0 or (global_step % interval_steps) != 0:
+    if global_step not in checkpoint_steps:
         return None
 
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
