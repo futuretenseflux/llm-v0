@@ -118,10 +118,9 @@ def build_optimizer_muon(
     return Muon(
         param_groups,
         lr=muon_lr, # Global default
+        mu=momentum,
         weight_decay=weight_decay,
-        momentum=momentum,
         nesterov=nesterov,
-        ns_steps=ns_steps,
     )
 
 def clip_grad_norm(parameters, max_norm: float, norm_type: float = 2.0):
