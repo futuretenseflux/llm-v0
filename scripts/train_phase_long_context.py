@@ -74,6 +74,7 @@ def main():
     loader = DataLoader(
         long_context_dataset,
         batch_size=args.batch,
+        shuffle=True,
         num_workers=16,
         pin_memory=True,
         persistent_workers=True,
