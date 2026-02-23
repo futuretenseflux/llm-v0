@@ -1,6 +1,7 @@
 import yaml
 import torch
 import argparse
+import os
 from src.data.pretraining.first_phase.dataset import BinaryTokenDataset
 from src.model.transformer import Transformer
 from torch.utils.data import DataLoader
@@ -37,8 +38,7 @@ def main():
         long_context=True # Enable long context training
     )
 
-    checkpoint = torch.load(args.path, map_location="cuda")
-    model.load_state_dict(checkpoint["model_state_dict"])
+    model = torch.load(args.path, map_location="cuda")
     model = model.to(device="cuda", dtype=torch.bfloat16)
     model = torch.compile(model, options={"triton.cudagraphs": False})
 
@@ -85,6 +85,12 @@ def main():
         stop_loss=args.stop_loss,
         total_steps=steps,
     )
+
+    model_output_dir = config["model_output_dir"]
+    os.makedirs(model_output_dir, exist_ok=True)
+    save_path = os.path.join(model_output_dir, f"lc_{int(args.seq_length)}.pt")
+    model_to_save = getattr(model, "_orig_mod", model)
+    torch.save(model_to_save, save_path)
 
 if __name__ == "__main__":
     main()
