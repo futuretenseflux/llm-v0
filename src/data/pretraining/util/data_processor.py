@@ -30,12 +30,12 @@ def tokenize_batch(batch, tokenizer_name):
         "ids": [ids + [eos] for ids in tokens["input_ids"]]
     }
 
-def tokenize_dataset(dataset, tokenizer_name):
+def tokenize_dataset(dataset, tokenizer_name, num_proc):
     dataset = dataset.map(
         tokenize_batch,
         batched=True,
         batch_size=1000,
-        num_proc=max(1, int(os.cpu_count() * 0.8)),
+        num_proc=num_proc or max(1, int(os.cpu_count() * 0.8)),
         fn_kwargs={"tokenizer_name": tokenizer_name},
         remove_columns=dataset.column_names,
     )
@@ -85,6 +85,8 @@ def load_and_process_dataset(
     tokenizer_name: Optional[str] = None
 ):
     config = load_config()
+
+    num_proc = config.get('num_proc', None)
     
     dataset_name = config['datasets'][dataset_key]
     
@@ -105,5 +107,5 @@ def load_and_process_dataset(
         dataset = load_dataset(dataset_name, subset, split=split) if subset else load_dataset(dataset_name, split=split)
     
     dataset = dataset.shuffle(seed=shuffle_seed)
-    tokenized_normalized_suffixed = tokenize_dataset(dataset, tokenizer_name)
+    tokenized_normalized_suffixed = tokenize_dataset(dataset, tokenizer_name, num_proc=num_proc)
     write_tokenized_dataset(tokenized_normalized_suffixed, write_path, output_prefix, shard_size_tokens=500_000_000, dtype=np.uint16)
