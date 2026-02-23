@@ -80,10 +80,14 @@ def main():
         prefetch_factor=2
     )
 
+    lc_adamw_lr = float(config["learning_rate"]) / 10.0
+    lc_muon_lr = float(config.get("muon_lr", 0.02))
+    print(f"Long-context LR override: adamw_lr={lc_adamw_lr:g} (base={float(config['learning_rate']):g}/10), muon_lr={lc_muon_lr:g}")
+
     optimizer = build_optimizer_muon(
         model, 
-        muon_lr=config.get("muon_lr", 0.02),
-        adamw_lr=config["learning_rate"],
+        muon_lr=lc_muon_lr,
+        adamw_lr=lc_adamw_lr,
         weight_decay=config["optim_weight_decay"]
     )
     scheduler = build_scheduler(optimizer, steps)
