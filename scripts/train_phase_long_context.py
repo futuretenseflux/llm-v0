@@ -38,7 +38,8 @@ def main():
         long_context=True # Enable long context training
     )
 
-    model = torch.load(args.path, map_location="cuda")
+    model_dict = torch.load(args.path, map_location="cuda")
+    model.load_state_dict(model_dict)
     model = model.to(device="cuda", dtype=torch.bfloat16)
     model = torch.compile(model, options={"triton.cudagraphs": False})
 
