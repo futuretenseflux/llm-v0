@@ -2,10 +2,10 @@ import os
 import yaml
 import torch
 
-from src.data.pretraining.training.dataset import BinaryTokenDataset
-from src.data.pretraining.training.fim import FIMDataset
-from src.data.pretraining.training.sampler import ProportionSampler
-from src.data.pretraining.training.sampling_ratio_generator import DATASET_ORDER, get_sampling_ratios
+from src.data.pretraining.first_phase.dataset import BinaryTokenDataset
+from src.data.pretraining.first_phase.fim import FIMDataset
+from src.data.pretraining.first_phase.sampler import ProportionSampler
+from src.data.pretraining.first_phase.sampling_ratio_generator import DATASET_ORDER, get_sampling_ratios
 from src.model.transformer import Transformer
 from torch.utils.data import DataLoader, ConcatDataset
 from src.train.logger import TrainLogger
@@ -16,8 +16,9 @@ from transformers import AutoTokenizer
 with open("configs/lm.yaml", "r") as f:
     config = yaml.safe_load(f)
 
-output_dir = config["output_dir"]
-checkpoint_dir = config.get("checkpoint_dir", output_dir + "/checkpoints")
+data_output_dir = config["data_output_dir"]
+pretraining_path = data_output_dir + "/pretraining"
+checkpoint_output_dir = config["checkpoint_output_dir"]
 
 SEQ_LENGTH = config["seq_length"]
 STRIDE = config.get("stride", None)
@@ -33,9 +34,9 @@ if any(tid is None or int(tid) < 0 for tid in [fim_prefix_id, fim_middle_id, fim
 fim_prob_code = float(config.get("fim_prob_code", 0.5))
 
 dataset_dict = {
-    "books" : BinaryTokenDataset(output_dir, "books", SEQ_LENGTH, STRIDE),
+    "books" : BinaryTokenDataset(pretraining_path, "books", SEQ_LENGTH, STRIDE),
     "code" : FIMDataset(
-        BinaryTokenDataset(output_dir, "code", SEQ_LENGTH, STRIDE),
+        BinaryTokenDataset(pretraining_path, "code", SEQ_LENGTH, STRIDE),
         seq_length=SEQ_LENGTH,
         fim_prefix_id=fim_prefix_id,
         fim_middle_id=fim_middle_id,
@@ -43,11 +44,11 @@ dataset_dict = {
         fim_prob=fim_prob_code,
         rng_seed=42,
     ),
-    "conv_forum" : BinaryTokenDataset(output_dir, "conv_forum", SEQ_LENGTH, STRIDE),
-    "math" : BinaryTokenDataset(output_dir, "math", SEQ_LENGTH, STRIDE),
-    "papers" : BinaryTokenDataset(output_dir, "papers", SEQ_LENGTH, STRIDE),
-    "primer" : BinaryTokenDataset(output_dir, "primer", SEQ_LENGTH, STRIDE),
-    "web" : BinaryTokenDataset(output_dir, "web", SEQ_LENGTH, STRIDE)
+    "conv_forum" : BinaryTokenDataset(pretraining_path, "conv_forum", SEQ_LENGTH, STRIDE),
+    "math" : BinaryTokenDataset(pretraining_path, "math", SEQ_LENGTH, STRIDE),
+    "papers" : BinaryTokenDataset(pretraining_path, "papers", SEQ_LENGTH, STRIDE),
+    "primer" : BinaryTokenDataset(pretraining_path, "primer", SEQ_LENGTH, STRIDE),
+    "web" : BinaryTokenDataset(pretraining_path, "web", SEQ_LENGTH, STRIDE)
 }
 
 #ordered by dataset order
@@ -127,6 +128,6 @@ train_loop(
     max_grad_norm=1.0,
     tokens_elapsed=tokens_elapsed,
     total_steps=STEPS,
-    checkpoint_dir=checkpoint_dir,
+    checkpoint_dir=checkpoint_output_dir,
     checkpoint_steps=checkpoint_steps,
 )

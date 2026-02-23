@@ -43,17 +43,17 @@ def tokenize_dataset(dataset, tokenizer_name):
 
 def write_tokenized_dataset(
     dataset,
-    output_dir,
+    write_path,
     output_prefix: str,
     shard_size_tokens=500_000_000,
     dtype=np.uint16,
 ):
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(write_path, exist_ok=True)
 
     shard = 0
     token_count = 0
 
-    output_path = os.path.join(output_dir, f"{output_prefix}_{shard}.bin")
+    output_path = os.path.join(write_path, f"{output_prefix}_{shard}.bin")
     f = open(output_path, "wb", buffering=1024*1024*64)  # 64MB buffer
 
     try:
@@ -67,7 +67,7 @@ def write_tokenized_dataset(
                 shard += 1
                 token_count = 0
 
-                output_path = os.path.join(output_dir, f"{output_prefix}_{shard}.bin")
+                output_path = os.path.join(write_path, f"{output_prefix}_{shard}.bin")
                 f = open(output_path, "wb", buffering=1024*1024*64)
 
     finally:
@@ -77,7 +77,7 @@ def write_tokenized_dataset(
 def load_and_process_dataset(
     dataset_key: str,
     output_prefix: Optional[str] = None,
-    output_dir: Optional[str] = None,
+    write_path: Optional[str] = None,
     split: str = "train",
     shuffle_seed: int = 42,
     subset: Optional[str] = None,
@@ -89,11 +89,11 @@ def load_and_process_dataset(
     dataset_name = config['datasets'][dataset_key]
     
     if tokenizer_name is None:
-        tokenizer_name = config.get('tokenizer_model', 'facebook/galactica-6.7b')
+        tokenizer_name = config.get('tokenizer_model', 'tokenizers/galactica-6.7b-fork')
     if output_prefix is None:
         output_prefix = dataset_key
-    if output_dir is None:
-        output_dir = config.get('output_dir', 'data/processed')
+    if write_path is None:
+        write_path = config.get('data_output_dir' + '/pretraining', 'output/data/pretraining')
     
     if concatenate_datasets_list:
         datasets = []
@@ -106,4 +106,4 @@ def load_and_process_dataset(
     
     dataset = dataset.shuffle(seed=shuffle_seed)
     tokenized_normalized_suffixed = tokenize_dataset(dataset, tokenizer_name)
-    write_tokenized_dataset(tokenized_normalized_suffixed, output_dir, output_prefix, shard_size_tokens=500_000_000, dtype=np.uint16)
+    write_tokenized_dataset(tokenized_normalized_suffixed, write_path, output_prefix, shard_size_tokens=500_000_000, dtype=np.uint16)

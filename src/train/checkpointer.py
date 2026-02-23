@@ -36,9 +36,12 @@ def maybe_save_checkpoint(
     tokens_elapsed: int,
     global_step: int,
     checkpoint_dir: str,
-    checkpoint_steps: Set[int],
+    checkpoint_steps: Optional[Set[int]],
 ) -> Optional[str]:
     if global_step <= 0:
+        return None
+
+    if not checkpoint_steps:
         return None
 
     if global_step not in checkpoint_steps:

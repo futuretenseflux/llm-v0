@@ -5,7 +5,7 @@ from .logger import TrainLogger
 from .checkpointer import maybe_save_checkpoint
 import torch
 from torch import amp
-from ..data.pretraining.training.sampling_ratio_generator import get_sampling_ratios
+from ..data.pretraining.first_phase.sampling_ratio_generator import get_sampling_ratios
 from typing import Optional, Set
 
 try:
@@ -18,10 +18,12 @@ def train_loop(
     use_amp: bool = True, tokens_elapsed: int = 0, total_steps: int = 0, checkpoint_dir: str = "checkpoints", grad_accum_steps: int = 1,
     micro_batch_size: int | None = None,
     checkpoint_steps: Optional[Set[int]] = None,
+    token_budget=None,
+    stop_loss=None,
 ):
     model.train()
     if checkpoint_steps is None:
-        raise ValueError("checkpoint_steps must be provided")
+        checkpoint_steps = set()
     global_step = 0
     total_loss = 0.0
     scaler = None
@@ -73,7 +75,7 @@ def train_loop(
                     logits = model(micro_input)
                 loss_micro = cross_entropy_shifted(logits=logits, targets=micro_targets)
                 batch_loss += loss_micro.item()
-                loss = loss_micro / (grad_accum_steps * num_micro)
+                loss = loss_micro * (micro_input.size(0) / (batch_size * grad_accum_steps))
 
             if scaler is not None:
                 scaler.scale(loss).backward()
@@ -116,6 +118,22 @@ def train_loop(
             )
             if checkpoint_path is not None and logger is not None:
                 logger.log_info(f"Checkpoint saved at step {global_step} with {tokens_elapsed//1_000_000_000}B tokens: {checkpoint_path}")
+
+            if token_budget is not None and int(tokens_elapsed) >= int(token_budget):
+                msg = f"Stopping: token_budget reached (tokens_elapsed={int(tokens_elapsed)} token_budget={int(token_budget)})"
+                if logger is not None:
+                    logger.log_info(msg)
+                else:
+                    print(msg)
+                break
+
+            if stop_loss is not None and float(avg_batch_loss) <= float(stop_loss):
+                msg = f"Stopping: stop_loss reached (loss={float(avg_batch_loss):.6f} stop_loss={float(stop_loss):.6f})"
+                if logger is not None:
+                    logger.log_info(msg)
+                else:
+                    print(msg)
+                break
 
         if is_accum_boundary:
             global_step += 1

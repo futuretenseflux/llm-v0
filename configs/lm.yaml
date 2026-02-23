@@ -19,7 +19,7 @@ batch_size: 256
 micro_batch_size: 28
 grad_accum_steps: 1
 seq_length: 1024
-seq_length_long: 16384
+stride: 0.5
 rope_base: 50000
 rope_base_long: 1000000
 
@@ -34,8 +34,11 @@ corpus_split:
 
 # Dataset configuration
 tokenizer_model: "tokenizers/galactica-6.7b-fork"
-output_dir: "data/pretraining/processed"
-checkpoint_dir: "checkpoints/phase1"
+
+# Output directories
+data_output_dir: "output/data"
+checkpoint_output_dir: "output/checkpoints"
+model_output_dir: "output/models"
 
 datasets:
   books: "sci-datasets/sci-books"
@@ -45,3 +48,5 @@ datasets:
   papers: "sci-datasets/sci-papers"
   primer: "sci-datasets/sci-primer-v1"
   web: "sci-datasets/fineweb-edu-sci-super"
+  long_context: "sci-datasets/sci-long-context"
+  

@@ -11,7 +11,24 @@ class BinaryTokenDataset(Dataset):
         lengths = [len(m) for m in self._mmaps]
         self._offsets = np.cumsum([0] + lengths, dtype=np.int64)
         self.seq_length = seq_length
-        self.stride = stride if stride is not None else seq_length
+
+        if stride is None:
+            stride_ratio = 0.5
+        else:
+            if not isinstance(stride, float):
+                raise TypeError(f"stride must be a float ratio in (0, 1], got {type(stride).__name__} (stride={stride})")
+            stride_ratio = float(stride)
+
+        if not (0.0 < stride_ratio <= 1.0):
+            raise ValueError(f"stride ratio must be in (0, 1], got {stride_ratio}")
+
+        stride_tokens = int(stride_ratio * int(seq_length))
+        if stride_tokens < 1:
+            raise ValueError(
+                f"stride ratio too small for seq_length; produced stride_tokens={stride_tokens} (stride={stride_ratio}, seq_length={seq_length})"
+            )
+
+        self.stride = stride_tokens
     
     def __len__(self):
         n = int(self._offsets[-1])

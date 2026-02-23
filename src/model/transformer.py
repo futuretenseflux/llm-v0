@@ -4,11 +4,11 @@ import torch
 from src.model.decoder import DecoderLayer
 
 class Transformer(nn.Module):
-    def __init__(self, vocab_size, dim_model, dim_k, num_q_heads, group_size, num_decoder_layers, intermediate_size, eps=1e-6, dropout=0.1):
+    def __init__(self, vocab_size, dim_model, dim_k, num_q_heads, group_size, num_decoder_layers, intermediate_size, eps=1e-6, dropout=0.1, long_context=False):
         super().__init__()
         self.token_embedding = nn.Embedding(vocab_size, dim_model)
         self.decoder_layers = nn.ModuleList(
-            [DecoderLayer(dim_model, dim_k, num_q_heads, group_size, intermediate_size, eps, dropout=dropout) for _ in range(num_decoder_layers)]
+            [DecoderLayer(dim_model, dim_k, num_q_heads, group_size, intermediate_size, eps, dropout=dropout, long_context=long_context) for _ in range(num_decoder_layers)]
         )
         self.rms_norm = nn.RMSNorm(dim_model, eps)
         self.output_head = nn.Linear(dim_model, vocab_size, bias=False)

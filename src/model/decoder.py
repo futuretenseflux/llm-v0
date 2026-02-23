@@ -5,9 +5,9 @@ from src.model.attention import GroupedQueryAttention
 from src.model.activations import SwiGLU
 
 class DecoderLayer(nn.Module):
-    def __init__(self, dim_model, dim_k, num_q_heads, group_size, intermediate_size, eps=1e-6, dropout=0.1):
+    def __init__(self, dim_model, dim_k, num_q_heads, group_size, intermediate_size, eps=1e-6, dropout=0.1, long_context=False):
         super().__init__()
-        self.gq_attn = GroupedQueryAttention(num_q_heads, group_size, dim_model, dim_k, dropout=dropout, enable_rope=True)
+        self.gq_attn = GroupedQueryAttention(num_q_heads, group_size, dim_model, dim_k, dropout=dropout, enable_rope=True, long_context=long_context)
         self.rms_norm_1 = nn.RMSNorm(normalized_shape=dim_model, eps=eps)
         self.attention_dropout = nn.Dropout(p=dropout)
         self.swiglu = SwiGLU(dim_in=dim_model, intermediate_size=intermediate_size)
