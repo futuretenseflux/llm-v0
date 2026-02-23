@@ -92,7 +92,7 @@ def main():
     )
     scheduler = build_scheduler(optimizer, steps)
 
-    logger = TrainLogger(project="llm-long-context-train", run_name="lc-train-run-1", config=config)
+    logger = TrainLogger(project="llm-long-context-train", run_name=f"lc-{int(args.seq_length)}-train-run-1", config=config)
 
     train_loop(
         model=model,
