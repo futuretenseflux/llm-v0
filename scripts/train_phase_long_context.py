@@ -38,8 +38,28 @@ def main():
         long_context=True # Enable long context training
     )
 
-    model_dict = torch.load(args.path, map_location="cuda")
-    model.load_state_dict(model_dict)
+    state = torch.load(args.path, map_location="cpu")
+    if isinstance(state, dict) and "model_state_dict" in state:
+        state = state["model_state_dict"]
+
+    def _strip_prefix(sd: dict, prefix: str) -> dict:
+        if not isinstance(sd, dict):
+            return sd
+        if not any(k.startswith(prefix) for k in sd.keys()):
+            return sd
+        return {k[len(prefix):]: v for k, v in sd.items() if k.startswith(prefix)}
+
+    state = _strip_prefix(state, "_orig_mod.")
+    state = _strip_prefix(state, "module.")
+
+    missing, unexpected = model.load_state_dict(state, strict=False)
+    if missing or unexpected:
+        print(f"load_state_dict: missing={len(missing)} unexpected={len(unexpected)}")
+        if missing:
+            print("missing keys (first 50):", missing[:50])
+        if unexpected:
+            print("unexpected keys (first 50):", unexpected[:50])
+        raise RuntimeError("Model state_dict did not match current Transformer definition. See printed missing/unexpected keys.")
     model = model.to(device="cuda", dtype=torch.bfloat16)
     model = torch.compile(model, options={"triton.cudagraphs": False})
 
@@ -91,7 +111,7 @@ def main():
     os.makedirs(model_output_dir, exist_ok=True)
     save_path = os.path.join(model_output_dir, f"lc_{int(args.seq_length)}.pt")
     model_to_save = getattr(model, "_orig_mod", model)
-    torch.save(model_to_save, save_path)
+    torch.save(model_to_save.state_dict(), save_path)
 
 if __name__ == "__main__":
     main()
