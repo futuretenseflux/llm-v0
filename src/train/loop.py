@@ -26,6 +26,7 @@ def train_loop(
         checkpoint_steps = set()
     global_step = 0
     total_loss = 0.0
+    loss_ema = None
     scaler = None
     sdpa_flash_probe_done = False
 
@@ -85,6 +86,11 @@ def train_loop(
         avg_batch_loss = batch_loss / num_micro
         is_accum_boundary = ((batch_idx + 1) % grad_accum_steps) == 0
         if is_accum_boundary:
+            if loss_ema is None:
+                loss_ema = float(avg_batch_loss)
+            else:
+                loss_ema = 0.95 * float(loss_ema) + 0.05 * float(avg_batch_loss)
+
             if max_grad_norm is not None:
                 clip_grad_norm(model, max_grad_norm)
             if scaler is not None:
@@ -127,8 +133,8 @@ def train_loop(
                     print(msg)
                 break
 
-            if stop_loss is not None and float(avg_batch_loss) <= float(stop_loss):
-                msg = f"Stopping: stop_loss reached (loss={float(avg_batch_loss):.6f} stop_loss={float(stop_loss):.6f})"
+            if stop_loss is not None and loss_ema is not None and float(loss_ema) <= float(stop_loss):
+                msg = f"Stopping: stop_loss reached (loss_ema={float(loss_ema):.6f} stop_loss={float(stop_loss):.6f})"
                 if logger is not None:
                     logger.log_info(msg)
                 else:
