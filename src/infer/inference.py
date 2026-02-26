@@ -99,3 +99,51 @@ def run_inference(
 
     output_text = tokenizer.decode(input_ids[0], skip_special_tokens=True)
     return output_text
+
+
+def score_candidates_loglikelihood(
+    model_path: str,
+    prompt: str,
+    candidates: list[str],
+    *,
+    device: Optional[str] = None,
+) -> list[float]:
+    model, tokenizer, device = load_inference_bundle(model_path, device=device)
+
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    if len(candidates) == 0:
+        return []
+
+    prompt_ids = tokenizer(prompt, add_special_tokens=False).input_ids
+    if len(prompt_ids) == 0:
+        raise ValueError("Prompt must tokenize to at least one token.")
+
+    texts = [prompt + c for c in candidates]
+    batch = tokenizer(
+        texts,
+        add_special_tokens=False,
+        padding=True,
+        return_tensors="pt",
+    )
+    input_ids = batch.input_ids.to(device)
+    attention_mask = batch.attention_mask.to(device)
+
+    with torch.no_grad():
+        logits = model(input_ids)
+        log_probs = torch.log_softmax(logits[:, :-1, :], dim=-1)
+        targets = input_ids[:, 1:]
+        token_logps = log_probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+
+        cand_start = len(prompt_ids) - 1
+        if cand_start < 0:
+            cand_start = 0
+
+        pos_idx = torch.arange(token_logps.shape[1], device=device).unsqueeze(0)
+        valid_positions = attention_mask[:, 1:].bool()
+        cand_positions = pos_idx >= cand_start
+        mask = valid_positions & cand_positions
+
+        scores = (token_logps * mask).sum(dim=1)
+        return scores.detach().float().cpu().tolist()
