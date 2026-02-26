@@ -75,11 +75,26 @@ def build_prompt(subject: str, fewshot: Iterable[MMLUExample], test_ex: MMLUExam
 
 
 def list_mmlu_subjects(dataset_name: str) -> List[str]:
-    return list(get_dataset_config_names(dataset_name))
+    configs = list(get_dataset_config_names(dataset_name))
+    excluded = {"all", "auxiliary_train"}
+    return [c for c in configs if c not in excluded]
 
 
 def load_mmlu_split(dataset_name: str, subject: str, split: str):
     return load_dataset(dataset_name, subject, split=split)
+
+
+def load_first_available_split(dataset_name: str, subject: str, splits: List[str]):
+    last_err: Optional[Exception] = None
+    for split in splits:
+        try:
+            return load_mmlu_split(dataset_name, subject, split)
+        except ValueError as e:
+            last_err = e
+            continue
+    if last_err is not None:
+        raise last_err
+    raise ValueError(f"No splits provided for dataset={dataset_name} subject={subject}")
 
 
 def evaluate_subject(
@@ -91,8 +106,8 @@ def evaluate_subject(
     max_examples: Optional[int] = None,
     device: Optional[str] = None,
 ) -> Dict[str, Any]:
-    dev_ds = load_mmlu_split(dataset_name, subject, "dev")
-    test_ds = load_mmlu_split(dataset_name, subject, "test")
+    dev_ds = load_first_available_split(dataset_name, subject, ["dev", "validation"])
+    test_ds = load_first_available_split(dataset_name, subject, ["test", "validation"])
 
     fewshot_pool = [_row_to_example(dev_ds[i]) for i in range(min(len(dev_ds), k_shot))]
 
