@@ -1,5 +1,4 @@
 import os
-import yaml
 import torch
 
 from src.data.pretraining.first_phase.dataset import BinaryTokenDataset
@@ -12,9 +11,9 @@ from src.train.logger import TrainLogger
 from src.train.loop import train_loop
 from src.train.optim import build_optimizer_muon, build_scheduler
 from transformers import AutoTokenizer
+from src.utils.config import load_lm_config
 
-with open("configs/lm.yaml", "r") as f:
-    config = yaml.safe_load(f)
+config = load_lm_config()
 
 data_output_dir = config["data_output_dir"]
 pretraining_path = data_output_dir + "/pretraining"

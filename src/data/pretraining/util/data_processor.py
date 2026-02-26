@@ -1,5 +1,4 @@
-import yaml
-from pathlib import Path
+from src.utils.config import load_lm_config
 from datasets import load_dataset, Dataset, concatenate_datasets
 from transformers import AutoTokenizer
 import array
@@ -11,9 +10,7 @@ import numpy as np
 _tokenizer = None
 
 def load_config():
-    config_path = Path(__file__).parent.parent.parent.parent.parent / "configs" / "lm.yaml"
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+    return load_lm_config()
 
 def tokenize_batch(batch, tokenizer_name):
     global _tokenizer

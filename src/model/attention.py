@@ -3,10 +3,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from src.model.pe import RoPE
-import yaml
+from src.utils.config import load_lm_config
 
-with open("configs/lm.yaml", "r") as f:
-    lm_config = yaml.safe_load(f)
+lm_config = load_lm_config()
 
 class GroupedQueryAttention(nn.Module):
     def __init__(self, num_q_heads, group_size, dim_model, dim_k, dropout=0.1, enable_rope=True, long_context=False):

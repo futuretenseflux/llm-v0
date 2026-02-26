@@ -1,4 +1,3 @@
-import yaml
 import torch
 import argparse
 import os
@@ -8,6 +7,7 @@ from torch.utils.data import DataLoader
 from src.train.logger import TrainLogger
 from src.train.loop import train_loop
 from src.train.optim import build_optimizer_muon, build_scheduler
+from src.utils.config import load_lm_config
 
 def main():
     parser = argparse.ArgumentParser()
@@ -20,8 +20,7 @@ def main():
     
     args = parser.parse_args()
 
-    with open("configs/lm.yaml", "r") as f:
-        config = yaml.safe_load(f)
+    config = load_lm_config()
 
     dataset_dir = config["data_output_dir"] + "/pretraining"
 
