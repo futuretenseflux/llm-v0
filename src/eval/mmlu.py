@@ -85,7 +85,13 @@ def list_mmlu_subjects(dataset_name: str) -> List[str]:
 
 
 def load_mmlu_split(dataset_name: str, subject: str, split: str):
-    return load_dataset(path=dataset_name, name=subject, split=split)
+    try:
+        return load_dataset(path=dataset_name, name=subject, split=split)
+    except ValueError:
+        ds_all = load_dataset(path=dataset_name, name="all", split=split)
+        if "subject" not in ds_all.column_names:
+            raise
+        return ds_all.filter(lambda x: x["subject"] == subject)
 
 
 def load_first_available_split(dataset_name: str, subject: str, splits: List[str]):
