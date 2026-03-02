@@ -6,7 +6,7 @@ from transformers import AutoTokenizer
 from src.model.transformer import Transformer
 from src.utils.config import load_lm_config
 
-_INFERENCE_BUNDLE_CACHE: Dict[Tuple[str, str], Tuple[Transformer, Any, str]] = {}
+_INFERENCE_BUNDLE_CACHE: Dict[Tuple[str, str, bool], Tuple[Transformer, Any, str]] = {}
 
 def _sample_top_p(probs: torch.Tensor, top_p: float) -> torch.Tensor:
     sorted_probs, sorted_indices = torch.sort(probs, descending=True)
@@ -28,16 +28,20 @@ def load_inference_bundle(
     model_path: str,
     *,
     device: Optional[str] = None,
+    long_context: Optional[bool] = None,
 ) -> Tuple[Transformer, Any, str]:
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    cache_key = (model_path, device)
+    config = load_lm_config()
+    if long_context is None:
+        long_context = bool(config.get("long_context", False))
+
+    cache_key = (model_path, device, bool(long_context))
     cached = _INFERENCE_BUNDLE_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
-    config = load_lm_config()
     tokenizer = AutoTokenizer.from_pretrained(config["tokenizer_model"], use_fast=True)
 
     model = Transformer(
@@ -50,7 +54,7 @@ def load_inference_bundle(
         intermediate_size=int(config["intermediate_size"]),
         eps=float(config["eps"]),
         dropout=float(config["dropout"]),
-        long_context=bool(config.get("long_context", False)),
+        long_context=bool(long_context),
     )
 
     ckpt = torch.load(model_path, map_location="cpu")
@@ -74,8 +78,9 @@ def run_inference(
     temperature: float = 0.0,
     top_p: Optional[float] = None,
     device: Optional[str] = None,
+    long_context: Optional[bool] = None,
 ) -> str:
-    model, tokenizer, device = load_inference_bundle(model_path, device=device)
+    model, tokenizer, device = load_inference_bundle(model_path, device=device, long_context=long_context)
 
     input_ids = tokenizer(input_text, return_tensors="pt").input_ids.to(device)
 
@@ -107,8 +112,9 @@ def score_candidates_loglikelihood(
     candidates: list[str],
     *,
     device: Optional[str] = None,
+    long_context: Optional[bool] = None,
 ) -> list[float]:
-    model, tokenizer, device = load_inference_bundle(model_path, device=device)
+    model, tokenizer, device = load_inference_bundle(model_path, device=device, long_context=long_context)
 
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
