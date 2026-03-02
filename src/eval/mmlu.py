@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from datasets import get_dataset_config_names, load_dataset
+from datasets import get_dataset_config_names, load_dataset, load_dataset_builder
 
 from src.infer.inference import score_candidates_loglikelihood
 
@@ -75,13 +75,17 @@ def build_prompt(subject: str, fewshot: Iterable[MMLUExample], test_ex: MMLUExam
 
 
 def list_mmlu_subjects(dataset_name: str) -> List[str]:
-    configs = list(get_dataset_config_names(dataset_name))
+    try:
+        configs = list(get_dataset_config_names(dataset_name))
+    except ValueError:
+        builder = load_dataset_builder(dataset_name, name="all")
+        configs = list(builder.builder_configs.keys())
     excluded = {"all", "auxiliary_train"}
     return [c for c in configs if c not in excluded]
 
 
 def load_mmlu_split(dataset_name: str, subject: str, split: str):
-    return load_dataset(dataset_name, subject, split=split)
+    return load_dataset(path=dataset_name, name=subject, split=split)
 
 
 def load_first_available_split(dataset_name: str, subject: str, splits: List[str]):
