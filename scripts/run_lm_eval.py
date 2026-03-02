@@ -38,7 +38,6 @@ def main():
         model_args={
             "model_path": args.model_path,
             "device": args.device,
-            "batch_size": args.batch_size,
             "long_context": bool(args.long_context),
         },
         tasks=tasks,
