@@ -1,19 +1,12 @@
+import json
+
 im_start = '<|im_start|>'
 im_end = '<|im_end|>'
 think_start = "<|think|>\n" # Added \n for cleaner formatting
 think_end = "\n<|/think|>\n" # Added \n so content starts on a new line
 
-def make_system_message(m, cot_enabled, tools):
-    content = m.get('content', '')
-
-    if tools:
-        content += "\n\nAvailable tools:\n" + json.dumps(tools, indent=2)
-
-    if cot_enabled:
-        # Append the CoT signal neatly
-        content += "\nUse internal reasoning."
-    
-    return f"system\n{content}"
+def make_system_message(m):
+    return f"system\n{m.get('content', '')}"
 
 def make_user_message(m):
     return f"user\n{m.get('content', '')}"
