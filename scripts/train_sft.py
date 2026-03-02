@@ -14,6 +14,7 @@ from src.utils.config import load_lm_config
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--init-from", type=str, required=True)
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--micro-batch-size", type=int, default=None)
     parser.add_argument("--lr", type=float, default=1e-5)
@@ -64,7 +65,13 @@ def main() -> None:
         intermediate_size=int(config["intermediate_size"]),
         eps=float(config["eps"]),
         dropout=float(config["dropout"]),
+        long_context=bool(config.get("long_context", False)),
     )
+
+    ckpt = torch.load(str(args.init_from), map_location="cpu")
+    state_dict = ckpt.get("model_state_dict", ckpt)
+    model.load_state_dict(state_dict)
+    print(f"Loaded pretrained weights from: {args.init_from}")
 
     if "cuda" in str(device).lower():
         model = model.to(device=device, dtype=torch.bfloat16)
