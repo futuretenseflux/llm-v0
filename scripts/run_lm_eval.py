@@ -24,6 +24,7 @@ def main():
         help="Enable long-context RoPE base (default: true)",
     )
     parser.add_argument("--reasoning", action="store_true", help="Enable reasoning mode for sft_model")
+    parser.add_argument("--system-prompt", type=str, default=None, help="System prompt for sft_model (ChatML)")
     parser.add_argument("--output-path", default=None, help="Path to save results JSON")
     parser.add_argument("--limit", type=float, default=None, help="Limit number of examples per task (for debugging)")
     parser.add_argument("--num-fewshot", type=int, default=None, help="Number of few-shot examples")
@@ -43,6 +44,9 @@ def main():
     
     if args.reasoning:
         model_args["reasoning"] = True
+
+    if args.system_prompt is not None:
+        model_args["system_prompt"] = str(args.system_prompt)
     
     results = lm_eval.simple_evaluate(
         model=args.model,

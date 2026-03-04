@@ -53,11 +53,12 @@ class MyCustomLM(LM):
 class SFTModel(MyCustomLM):
     def __init__(self, **kwargs):
         self.reasoning_on = bool(kwargs.pop("reasoning", False))
+        self.system_prompt = str(kwargs.pop("system_prompt", "You are a helpful assistant."))
         super().__init__(**kwargs)
 
     def _process_context(self, context: str) -> str:
         messages = [
-            {"role": "system", "content": ""},
+            {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": context},
         ]
         return build_chatml_prompt(messages, reasoning_on=self.reasoning_on)
