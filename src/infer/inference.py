@@ -166,6 +166,20 @@ def load_inference_bundle(
 
     ckpt = torch.load(model_path, map_location="cpu")
     state_dict = ckpt.get("model_state_dict", ckpt)
+
+    if not isinstance(state_dict, dict):
+        raise TypeError(f"Expected a state_dict dict, got: {type(state_dict)}")
+
+    # Handle checkpoints saved from torch.compile(model) (prefix: '_orig_mod.')
+    # and DDP-wrapped models (prefix: 'module.').
+    def _strip_prefix(sd: Dict[str, Any], prefix: str) -> Dict[str, Any]:
+        if all(k.startswith(prefix) for k in sd.keys()):
+            return {k[len(prefix) :]: v for k, v in sd.items()}
+        return sd
+
+    state_dict = _strip_prefix(state_dict, "_orig_mod.")
+    state_dict = _strip_prefix(state_dict, "module.")
+
     model.load_state_dict(state_dict)
 
     infer_dtype = torch.bfloat16 if device == "cuda" else torch.float32
