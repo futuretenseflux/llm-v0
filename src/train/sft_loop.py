@@ -18,11 +18,19 @@ def sft_train_loop(
     max_grad_norm: float = 1.0,
     use_amp: bool = True,
     log_every: int = 10,
+    pad_token_id: Optional[int] = None,
+    checkpoint_dir: Optional[str] = None,
+    checkpoint_interval_tokens: int = 50_000_000,
+    checkpoint_prefix: str = "sft",
+    wandb_run=None,
 ) -> None:
     model.train()
 
     global_step = 0
     start_time = time.time()
+
+    tokens_seen = 0
+    next_checkpoint_tokens = int(checkpoint_interval_tokens) if checkpoint_dir is not None else None
 
     optimizer.zero_grad(set_to_none=True)
     mark_step_begin = getattr(getattr(torch, "compiler", None), "cudagraph_mark_step_begin", None)
@@ -32,6 +40,11 @@ def sft_train_loop(
     for batch_idx, (input_ids, targets) in enumerate(train_loader):
         input_ids = input_ids.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
+
+        if pad_token_id is None:
+            tokens_seen += int(input_ids.numel())
+        else:
+            tokens_seen += int((input_ids != int(pad_token_id)).sum().item())
 
         batch_size = int(input_ids.size(0))
         mb = int(micro_batch_size) if micro_batch_size is not None else batch_size
@@ -73,6 +86,22 @@ def sft_train_loop(
 
         global_step += 1
 
+        if checkpoint_dir is not None and next_checkpoint_tokens is not None and tokens_seen >= next_checkpoint_tokens:
+            ckpt_path = f"{checkpoint_dir}/{checkpoint_prefix}_tok{next_checkpoint_tokens}.pt"
+            torch.save(model.state_dict(), ckpt_path)
+            if wandb_run is not None:
+                try:
+                    wandb_run.log(
+                        {
+                            "checkpoint/tokens": int(next_checkpoint_tokens),
+                        },
+                        step=int(global_step),
+                    )
+                except Exception:
+                    pass
+            while tokens_seen >= next_checkpoint_tokens:
+                next_checkpoint_tokens += int(checkpoint_interval_tokens)
+
         if log_every and (global_step % int(log_every) == 0):
             elapsed = time.time() - start_time
             steps_per_sec = global_step / max(elapsed, 1e-9)
@@ -88,3 +117,16 @@ def sft_train_loop(
                 msg += f" | lr {lr:.3e}"
             msg += f" | {steps_per_sec:.2f} steps/s"
             print(msg)
+
+            if wandb_run is not None:
+                try:
+                    metrics = {
+                        "train/loss": float(avg_batch_loss),
+                        "train/steps_per_sec": float(steps_per_sec),
+                        "train/tokens_seen": int(tokens_seen),
+                    }
+                    if lr is not None:
+                        metrics["train/lr"] = float(lr)
+                    wandb_run.log(metrics, step=int(global_step))
+                except Exception:
+                    pass

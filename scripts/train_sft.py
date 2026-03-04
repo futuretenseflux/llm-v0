@@ -18,11 +18,13 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--micro-batch-size", type=int, default=None)
     parser.add_argument("--lr", type=float, default=1e-5)
-    parser.add_argument("--muon-lr", type=float, default=1e-2)
+    parser.add_argument("--muon-lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-2)
     parser.add_argument("--warmup-ratio", type=float, default=0.05)
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
     parser.add_argument("--log-every", type=int, default=10)
+    parser.add_argument("--checkpoint-interval-tokens", type=int, default=50_000_000)
+    parser.add_argument("--checkpoint-prefix", type=str, default="sft")
     parser.add_argument("--num-workers", type=int, default=8)
     parser.add_argument("--pin-memory", action="store_true")
     parser.add_argument("--compile", action="store_true")
@@ -92,6 +94,13 @@ def main() -> None:
 
     scheduler = build_scheduler(optimizer, total_steps, warmup_ratio=float(args.warmup_ratio))
 
+    checkpoint_dir = str(config["checkpoint_output_dir"])
+    model_output_dir = str(config["model_output_dir"])
+
+    os.makedirs(model_output_dir, exist_ok=True)
+    if checkpoint_dir is not None:
+        os.makedirs(checkpoint_dir, exist_ok=True)
+
     print(
         "SFT config | "
         f"device={device} "
@@ -100,6 +109,33 @@ def main() -> None:
         f"total_steps={total_steps} "
         f"lr={float(args.lr):.3e} "
         f"muon_lr={float(args.muon_lr):.3e}"
+    )
+
+    try:
+        import wandb  # type: ignore
+    except ModuleNotFoundError as e:
+        raise ModuleNotFoundError(
+            "wandb is not installed. Install it with 'pip install wandb' to run SFT training."
+        ) from e
+
+    init_from_name = os.path.splitext(os.path.basename(str(args.init_from)))[0]
+    wandb_run = wandb.init(
+        project="sft",
+        name=f"sft_{init_from_name}",
+        config={
+            "init_from": str(args.init_from),
+            "batch_size": int(batch_size),
+            "micro_batch_size": (int(args.micro_batch_size) if args.micro_batch_size is not None else None),
+            "lr": float(args.lr),
+            "muon_lr": float(args.muon_lr),
+            "weight_decay": float(args.weight_decay),
+            "warmup_ratio": float(args.warmup_ratio),
+            "max_grad_norm": float(args.max_grad_norm),
+            "total_steps": int(total_steps),
+            "checkpoint_interval_tokens": int(args.checkpoint_interval_tokens),
+            "checkpoint_dir": str(checkpoint_dir),
+            "model_output_dir": str(model_output_dir),
+        },
     )
 
     sft_train_loop(
@@ -112,10 +148,14 @@ def main() -> None:
         max_grad_norm=float(args.max_grad_norm),
         use_amp=True,
         log_every=int(args.log_every),
+        pad_token_id=int(pad_token_id),
+        checkpoint_dir=checkpoint_dir,
+        checkpoint_interval_tokens=int(args.checkpoint_interval_tokens),
+        checkpoint_prefix=str(args.checkpoint_prefix),
+        wandb_run=wandb_run,
     )
 
-    os.makedirs(config["model_output_dir"], exist_ok=True)
-    save_path = os.path.join(config["model_output_dir"], str(args.save_name))
+    save_path = os.path.join(model_output_dir, str(args.save_name))
     torch.save(
         {
             "model_state_dict": model.state_dict(),
