@@ -203,7 +203,9 @@ def run_inference(
 ) -> str:
     model, tokenizer, device = load_inference_bundle(model_path, device=device, long_context=long_context)
 
-    input_ids = tokenizer(input_text, return_tensors="pt").input_ids.to(device)
+    input_ids = tokenizer(input_text, return_tensors="pt", add_special_tokens=False).input_ids.to(device)
+    prompt_len = int(input_ids.shape[1])
+    eos_token_id = tokenizer.eos_token_id
 
     with torch.no_grad():
         for _ in range(max_new_tokens):
@@ -223,8 +225,11 @@ def run_inference(
 
             input_ids = torch.cat([input_ids, next_token], dim=1)
 
-    output_text = tokenizer.decode(input_ids[0], skip_special_tokens=True)
-    return output_text
+            if eos_token_id is not None and int(next_token.item()) == int(eos_token_id):
+                break
+
+    gen_ids = input_ids[0, prompt_len:]
+    return tokenizer.decode(gen_ids, skip_special_tokens=True)
 
 
 def score_candidates_loglikelihood(
