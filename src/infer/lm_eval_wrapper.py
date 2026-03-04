@@ -2,7 +2,7 @@
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
-from typing import List, Tuple, Optional, Union, Dict
+from typing import List, Tuple, Optional, Union
 
 from lm_eval.api.model import LM
 from lm_eval.api.registry import register_model
@@ -10,19 +10,8 @@ from lm_eval.api.instance import Instance
 
 from src.infer.inference import load_inference_bundle, build_chatml_prompt
 
-@register_model("sft_model", "chat_model")
-class SFTModel(MyCustomLM):
-    def __init__(self, **kwargs):
-        self.reasoning_on = bool(kwargs.pop("reasoning", False))
-        super().__init__(**kwargs)
-
-    def _process_context(self, context: str) -> str:
-        messages = [
-            {"role": "system", "content": ""},
-            {"role": "user", "content": context},
-        ]
-        return build_chatml_prompt(messages, reasoning_on=self.reasoning_on)
-
+@register_model("local_model", "my_custom_model")
+class MyCustomLM(LM):
     def __init__(
         self,
         model_path: str,
@@ -38,19 +27,16 @@ class SFTModel(MyCustomLM):
         self.max_length = int(max_length)
 
         long_context = bool(kwargs.pop("long_context", True))
-        
-        # Load the model and tokenizer using your existing infrastructure
+
         self.model, self.tokenizer, self.device = load_inference_bundle(
             model_path=model_path,
             device=device,
             long_context=long_context,
         )
-        
-        # Ensure tokenizer has a pad token
+
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-            
-        # Enforce right padding for loglikelihood which assumes [tokens, pad] structure
+
         self.tokenizer.padding_side = "right"
 
     def tok_encode(self, string: str) -> List[int]:
@@ -61,6 +47,20 @@ class SFTModel(MyCustomLM):
 
     def _process_context(self, context: str) -> str:
         return context
+
+
+@register_model("sft_model", "chat_model")
+class SFTModel(MyCustomLM):
+    def __init__(self, **kwargs):
+        self.reasoning_on = bool(kwargs.pop("reasoning", False))
+        super().__init__(**kwargs)
+
+    def _process_context(self, context: str) -> str:
+        messages = [
+            {"role": "system", "content": ""},
+            {"role": "user", "content": context},
+        ]
+        return build_chatml_prompt(messages, reasoning_on=self.reasoning_on)
 
     def loglikelihood(self, requests: List[Instance]) -> List[Tuple[float, bool]]:
         """
