@@ -35,7 +35,7 @@ def load_inference_bundle(
 
     config = load_lm_config()
     if long_context is None:
-        long_context = bool(config.get("long_context", False))
+        long_context = bool(config.get("long_context", True))
 
     cache_key = (model_path, device, bool(long_context))
     cached = _INFERENCE_BUNDLE_CACHE.get(cache_key)

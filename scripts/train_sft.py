@@ -67,7 +67,7 @@ def main() -> None:
         intermediate_size=int(config["intermediate_size"]),
         eps=float(config["eps"]),
         dropout=float(config["dropout"]),
-        long_context=bool(config.get("long_context", False)),
+        long_context=True,
     )
 
     ckpt = torch.load(str(args.init_from), map_location="cpu")
