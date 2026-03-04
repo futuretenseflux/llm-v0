@@ -1,10 +1,14 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch
 from transformers import AutoTokenizer
 
 from src.model.transformer import Transformer
 from src.utils.config import load_lm_config
+
+
+_IM_START = "<|im_start|>"
+_IM_END = "<|im_end|>"
 
 _INFERENCE_BUNDLE_CACHE: Dict[Tuple[str, str, bool], Tuple[Transformer, Any, str]] = {}
 
@@ -22,6 +26,109 @@ def _sample_top_p(probs: torch.Tensor, top_p: float) -> torch.Tensor:
     next_token_sorted_idx = torch.multinomial(sorted_probs, num_samples=1)
     next_token = sorted_indices.gather(-1, next_token_sorted_idx)
     return next_token
+
+
+def build_chatml_prompt(
+    messages: Sequence[Dict[str, str]],
+    *,
+    reasoning_on: bool = False,
+) -> str:
+    """Build a ChatML-like prompt matching the SFT data format.
+
+    Notes:
+    - Messages are serialized as:
+      <|im_start|>{role}\n{content}<|im_end|>\n
+    - The returned prompt always ends with an *open* assistant turn:
+      <|im_start|>assistant\n
+      so the model can generate the assistant content.
+    - If reasoning_on is True, appends "[INTERNAL_REASONING=ON]" to the system
+      prompt content.
+    """
+
+    if len(messages) == 0:
+        raise ValueError("messages must be non-empty")
+
+    parts: List[str] = []
+    for m in messages:
+        role = m.get("role", "")
+        content = m.get("content", "")
+        if role not in {"system", "user", "assistant", "tool"}:
+            raise ValueError(f"Unsupported role: {role}")
+
+        if role == "system" and reasoning_on:
+            if len(content) == 0:
+                content = "[INTERNAL_REASONING=ON]"
+            else:
+                content = f"{content}\n[INTERNAL_REASONING=ON]"
+
+        parts.append(f"{_IM_START}{role}\n{content}{_IM_END}")
+
+    # Open assistant turn for generation.
+    parts.append(f"{_IM_START}assistant\n")
+    return "\n".join(parts)
+
+
+def _endswith_tokens(seq: torch.Tensor, suffix: torch.Tensor) -> bool:
+    if seq.numel() < suffix.numel():
+        return False
+    return bool(torch.equal(seq[-suffix.numel() :], suffix))
+
+
+def run_chat_inference(
+    model_path: str,
+    messages: Sequence[Dict[str, str]],
+    *,
+    reasoning_on: bool = False,
+    max_new_tokens: int = 256,
+    temperature: float = 0.0,
+    top_p: Optional[float] = None,
+    device: Optional[str] = None,
+    long_context: bool = True,
+) -> str:
+    """Run inference on a post-SFT model with ChatML formatting.
+
+    Returns only the assistant completion (not the full prompt).
+    """
+
+    prompt = build_chatml_prompt(messages, reasoning_on=reasoning_on)
+    model, tokenizer, device = load_inference_bundle(model_path, device=device, long_context=bool(long_context))
+
+    input_ids = tokenizer(prompt, return_tensors="pt", add_special_tokens=False).input_ids.to(device)
+    prompt_len = int(input_ids.shape[1])
+
+    stop_ids = tokenizer(_IM_END, add_special_tokens=False).input_ids
+    if len(stop_ids) == 0:
+        raise RuntimeError("Failed to tokenize stop string <|im_end|>.")
+    stop_ids_t = torch.tensor(stop_ids, dtype=torch.long, device=device)
+
+    with torch.no_grad():
+        for _ in range(int(max_new_tokens)):
+            logits = model(input_ids)
+            next_token_logits = logits[:, -1, :]
+
+            if temperature is None or float(temperature) == 0.0:
+                next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+            else:
+                scaled_logits = next_token_logits / float(temperature)
+                probs = torch.softmax(scaled_logits, dim=-1)
+
+                if top_p is not None and 0.0 < float(top_p) < 1.0:
+                    next_token = _sample_top_p(probs, float(top_p))
+                else:
+                    next_token = torch.multinomial(probs, num_samples=1)
+
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+
+            # Stop when the generated sequence ends with <|im_end|>
+            gen_seq = input_ids[0, prompt_len:]
+            if _endswith_tokens(gen_seq, stop_ids_t):
+                break
+
+    gen_ids = input_ids[0, prompt_len:]
+    if _endswith_tokens(gen_ids, stop_ids_t):
+        gen_ids = gen_ids[: -stop_ids_t.numel()]
+
+    return tokenizer.decode(gen_ids, skip_special_tokens=True)
 
 
 def load_inference_bundle(
