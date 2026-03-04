@@ -12,6 +12,7 @@ from src.infer import lm_eval_wrapper  # This registers 'my_custom_model'
 
 def main():
     parser = argparse.ArgumentParser(description="Run lm-eval harness with local model")
+    parser.add_argument("--model", default="my_custom_model", help="Model type to use (my_custom_model, sft_model)")
     parser.add_argument("--model-path", required=True, help="Path to the model checkpoint")
     parser.add_argument("--tasks", default="mmlu", help="Comma-separated list of tasks")
     parser.add_argument("--batch-size", type=int, default=1, help="Batch size per GPU")
@@ -22,6 +23,7 @@ def main():
         default=True,
         help="Enable long-context RoPE base (default: true)",
     )
+    parser.add_argument("--reasoning", action="store_true", help="Enable reasoning mode for sft_model")
     parser.add_argument("--output-path", default=None, help="Path to save results JSON")
     parser.add_argument("--limit", type=float, default=None, help="Limit number of examples per task (for debugging)")
     parser.add_argument("--num-fewshot", type=int, default=None, help="Number of few-shot examples")
@@ -30,16 +32,21 @@ def main():
     
     tasks = args.tasks.split(",")
     
-    print(f"Loading model from {args.model_path}...")
+    print(f"Loading model ({args.model}) from {args.model_path}...")
     print(f"Running tasks: {tasks}")
     
+    model_args = {
+        "model_path": args.model_path,
+        "device": args.device,
+        "long_context": bool(args.long_context),
+    }
+    
+    if args.reasoning:
+        model_args["reasoning"] = True
+    
     results = lm_eval.simple_evaluate(
-        model="my_custom_model",
-        model_args={
-            "model_path": args.model_path,
-            "device": args.device,
-            "long_context": bool(args.long_context),
-        },
+        model=args.model,
+        model_args=model_args,
         tasks=tasks,
         limit=args.limit,
         num_fewshot=args.num_fewshot,

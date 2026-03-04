@@ -2,16 +2,27 @@
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
-from typing import List, Tuple, Optional, Union
+from typing import List, Tuple, Optional, Union, Dict
 
 from lm_eval.api.model import LM
 from lm_eval.api.registry import register_model
 from lm_eval.api.instance import Instance
 
-from src.infer.inference import load_inference_bundle
+from src.infer.inference import load_inference_bundle, build_chatml_prompt
 
-@register_model("local_model", "my_custom_model")
-class MyCustomLM(LM):
+@register_model("sft_model", "chat_model")
+class SFTModel(MyCustomLM):
+    def __init__(self, **kwargs):
+        self.reasoning_on = bool(kwargs.pop("reasoning", False))
+        super().__init__(**kwargs)
+
+    def _process_context(self, context: str) -> str:
+        messages = [
+            {"role": "system", "content": ""},
+            {"role": "user", "content": context},
+        ]
+        return build_chatml_prompt(messages, reasoning_on=self.reasoning_on)
+
     def __init__(
         self,
         model_path: str,
@@ -48,6 +59,9 @@ class MyCustomLM(LM):
     def tok_decode(self, tokens: List[int]) -> str:
         return self.tokenizer.decode(tokens)
 
+    def _process_context(self, context: str) -> str:
+        return context
+
     def loglikelihood(self, requests: List[Instance]) -> List[Tuple[float, bool]]:
         """
         Compute log-likelihood of generating a continuation given a context.
@@ -58,7 +72,7 @@ class MyCustomLM(LM):
             batch = requests[i : i + self.batch_size_per_gpu]
             
             # Extract inputs
-            contexts = [req.args[0] for req in batch]
+            contexts = [self._process_context(req.args[0]) for req in batch]
             continuations = [req.args[1] for req in batch]
             
             # Combine context + continuation
@@ -165,7 +179,7 @@ class MyCustomLM(LM):
         results = []
         for i in tqdm(range(0, len(requests), self.batch_size_per_gpu), desc="Evaluating loglikelihood_rolling"):
             batch = requests[i : i + self.batch_size_per_gpu]
-            texts = [req.args[0] for req in batch]
+            texts = [self._process_context(req.args[0]) for req in batch]
             
             encodings = self.tokenizer(
                 texts,
@@ -203,7 +217,7 @@ class MyCustomLM(LM):
         results = []
         
         for req in tqdm(requests, desc="Generating"):
-            context = req.args[0]
+            context = self._process_context(req.args[0])
             gen_kwargs = req.args[1]
             
             until = gen_kwargs.get("until", [])

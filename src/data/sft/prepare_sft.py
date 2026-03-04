@@ -29,7 +29,7 @@ def process_example(examples):
         return_offsets_mapping=True,
         add_special_tokens=False,
         truncation=True,
-        max_length=max_length,
+        max_length=max_length - 1,
     )
     input_ids_batch = encodings['input_ids']
     offsets_batch = encodings['offset_mapping']
@@ -48,6 +48,10 @@ def process_example(examples):
                     labels[i] = input_ids[i]
                 if tok_start >= end_token_start_char and tok_end <= end_token_end_char:
                     labels[i] = input_ids[i]
+
+        if tokenizer.eos_token_id is not None:
+            input_ids.append(tokenizer.eos_token_id)
+            labels.append(tokenizer.eos_token_id)
 
         labels_batch.append(labels)
 
