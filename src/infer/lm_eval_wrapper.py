@@ -53,7 +53,14 @@ class MyCustomLM(LM):
 class SFTModel(MyCustomLM):
     def __init__(self, **kwargs):
         self.reasoning_on = bool(kwargs.pop("reasoning", False))
-        self.system_prompt = str(kwargs.pop("system_prompt", "You are a helpful assistant."))
+        self.system_prompt = str(
+            kwargs.pop(
+                "system_prompt",
+                "You are a highly knowledgeable expert across many academic disciplines.\n"
+                "Answer multiple-choice questions by selecting the single best option.\n"
+                "Respond with only the letter (A, B, C, or D).",
+            )
+        )
         super().__init__(**kwargs)
 
     def _process_context(self, context: str) -> str:
